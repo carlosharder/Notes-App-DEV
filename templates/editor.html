@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New Note' if mode == 'new' else 'Edit Note' }}{% endblock %}
+{% block content %}
+
+<h2 style="margin-bottom: 1rem;">{{ 'New Note' if mode == 'new' else 'Edit Note' }}</h2>
+
+<form method="POST" action="{{ '/notes' if mode == 'new' else '/notes/' + slug }}">
+    <div class="form-group">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" value="{{ title }}" placeholder="Note title..." required
+               style="font-size: 1.15rem; font-weight: 500;">
+    </div>
+    <div class="form-group">
+        <label for="body">Content <span class="text-muted" style="font-weight: normal;">(Markdown supported)</span></label>
+        <textarea id="body" name="body" rows="20" placeholder="Write your note in Markdown...">{{ body }}</textarea>
+    </div>
+    <div class="flex-between">
+        <div class="gap-sm" style="display: flex;">
+            <button type="submit" class="btn btn-primary">Save</button>
+            {% if mode == 'new' %}
+            <a href="/notes" class="btn btn-secondary">Cancel</a>
+            {% else %}
+            <a href="/notes/{{ slug }}" class="btn btn-secondary">Cancel</a>
+            {% endif %}
+        </div>
+        {% if mode == 'edit' %}
+        <form method="POST" action="/notes/{{ slug }}/delete" style="display:inline;"
+              onsubmit="return confirm('Delete this note?');">
+            <button type="submit" class="btn btn-danger">Delete</button>
+        </form>
+        {% endif %}
+    </div>
+</form>
+
+<details class="mt-2" style="margin-top: 1.5rem;">
+    <summary class="text-muted" style="cursor: pointer;">Markdown syntax help</summary>
+    <div class="card mt-1" style="font-size: 0.85rem;">
+        <code># Heading 1</code> &nbsp; <code>## Heading 2</code> &nbsp; <code>### Heading 3</code><br>
+        <code>**bold**</code> &nbsp; <code>*italic*</code> &nbsp; <code>~~strikethrough~~</code><br>
+        <code>[link text](url)</code> &nbsp; <code>![alt](image-url)</code><br>
+        <code>`inline code`</code> &nbsp; <code>```code block```</code><br>
+        <code>- list item</code> &nbsp; <code>1. numbered item</code><br>
+        <code>> blockquote</code> &nbsp; <code>---</code> horizontal rule
+    </div>
+</details>
+
+{% endblock %}

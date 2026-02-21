@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Notes{% endblock %}
+{% block content %}
+
+<form method="GET" action="/notes" style="margin-bottom: 1rem;">
+    <div style="display: flex; gap: 0.5rem;">
+        <input type="text" name="q" placeholder="Search notes..." value="{{ query }}">
+        <button type="submit" class="btn btn-primary">Search</button>
+        {% if query %}
+        <a href="/notes" class="btn btn-secondary">Clear</a>
+        {% endif %}
+    </div>
+</form>
+
+<p class="text-muted" style="margin-bottom: 1rem;">
+    {% if query %}
+        {{ notes|length }} note{{ 's' if notes|length != 1 }} matching "{{ query }}"
+    {% else %}
+        {{ notes|length }} note{{ 's' if notes|length != 1 }}
+    {% endif %}
+</p>
+
+{% if notes %}
+    {% for note in notes %}
+    <div class="card">
+        <div class="flex-between">
+            <div>
+                <a href="/notes/{{ note.slug }}" style="font-weight: 600; font-size: 1.05rem;">{{ note.title }}</a>
+                <p class="text-muted mt-1">{{ note.modified|format_date }}</p>
+                <p class="text-muted mt-1">{{ note.body|preview }}</p>
+            </div>
+            <div class="gap-sm" style="display: flex; align-items: center; flex-shrink: 0; margin-left: 1rem;">
+                <a href="/notes/{{ note.slug }}/edit" class="btn btn-secondary">Edit</a>
+                <form method="POST" action="/notes/{{ note.slug }}/delete" style="display:inline;"
+                      onsubmit="return confirm('Delete this note?');">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="card" style="text-align: center; padding: 2rem;">
+        <p>No notes yet.</p>
+        <p class="mt-2"><a href="/notes/new" class="btn btn-primary">Create your first note</a></p>
+    </div>
+{% endif %}
+
+{% endblock %}
