@@ -3,11 +3,45 @@ import re
 import glob
 import markdown
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, abort
+from flask import Flask, render_template, request, redirect, url_for, abort, flash
+from flask_login import (
+    LoginManager, UserMixin, login_user, logout_user,
+    login_required, current_user,
+)
+from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
-NOTES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'notes')
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
+
+NOTES_DIR = os.environ.get(
+    'NOTES_DIR',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'notes'),
+)
 os.makedirs(NOTES_DIR, exist_ok=True)
+
+
+# --- Authentication ---
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+AUTH_USERNAME = os.environ.get('APP_USERNAME', 'admin')
+AUTH_PASSWORD_HASH = os.environ.get(
+    'PASSWORD_HASH', generate_password_hash('admin', method='pbkdf2:sha256')
+)
+
+
+class User(UserMixin):
+    def __init__(self, username):
+        self.id = username
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    if user_id == AUTH_USERNAME:
+        return User(user_id)
+    return None
 
 
 # --- Helpers ---
@@ -111,14 +145,50 @@ app.jinja_env.filters['format_date'] = format_date
 app.jinja_env.filters['preview'] = preview_text
 
 
-# --- Routes ---
+# --- Context Processor ---
+
+@app.context_processor
+def inject_sidebar_data():
+    if current_user.is_authenticated:
+        return dict(sidebar_notes=get_all_notes())
+    return dict(sidebar_notes=[])
+
+
+# --- Auth Routes ---
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('note_list'))
+    if request.method == 'POST':
+        username = request.form.get('username', '')
+        password = request.form.get('password', '')
+        if username == AUTH_USERNAME and check_password_hash(AUTH_PASSWORD_HASH, password):
+            login_user(User(username))
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('note_list'))
+        flash('Invalid username or password.')
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+
+# --- Note Routes ---
 
 @app.route('/')
 def home():
-    return redirect(url_for('note_list'))
+    if current_user.is_authenticated:
+        return redirect(url_for('note_list'))
+    return redirect(url_for('login'))
 
 
 @app.route('/notes')
+@login_required
 def note_list():
     query = request.args.get('q', '').strip()
     notes = get_all_notes()
@@ -132,11 +202,13 @@ def note_list():
 
 
 @app.route('/notes/new')
+@login_required
 def note_new():
-    return render_template('editor.html', mode='new', title='', body='')
+    return render_template('editor.html', mode='new', title='', body='', active_slug=None)
 
 
 @app.route('/notes', methods=['POST'])
+@login_required
 def note_create():
     title = request.form.get('title', '').strip() or 'Untitled'
     body = request.form.get('body', '')
@@ -147,16 +219,18 @@ def note_create():
 
 
 @app.route('/notes/<slug>')
+@login_required
 def note_view(slug):
     filepath = os.path.join(NOTES_DIR, f'{slug}.md')
     if not os.path.isfile(filepath):
         abort(404)
     note = parse_note(filepath)
     content = render_md(note['body'])
-    return render_template('view.html', note=note, content=content)
+    return render_template('view.html', note=note, content=content, active_slug=slug)
 
 
 @app.route('/notes/<slug>/edit')
+@login_required
 def note_edit(slug):
     filepath = os.path.join(NOTES_DIR, f'{slug}.md')
     if not os.path.isfile(filepath):
@@ -164,11 +238,12 @@ def note_edit(slug):
     note = parse_note(filepath)
     return render_template(
         'editor.html', mode='edit', title=note['title'],
-        body=note['body'], slug=slug
+        body=note['body'], slug=slug, active_slug=slug,
     )
 
 
 @app.route('/notes/<slug>', methods=['POST'])
+@login_required
 def note_update(slug):
     filepath = os.path.join(NOTES_DIR, f'{slug}.md')
     if not os.path.isfile(filepath):
@@ -185,6 +260,7 @@ def note_update(slug):
 
 
 @app.route('/notes/<slug>/delete', methods=['POST'])
+@login_required
 def note_delete(slug):
     filepath = os.path.join(NOTES_DIR, f'{slug}.md')
     if os.path.isfile(filepath):
@@ -194,5 +270,5 @@ def note_delete(slug):
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))
-    debug = os.environ.get('DEBUG', 'false').lower() == 'true'
+    debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(debug=debug, host='0.0.0.0', port=port)

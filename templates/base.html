@@ -15,22 +15,111 @@
         a { color: #2563eb; text-decoration: none; }
         a:hover { text-decoration: underline; }
 
-        /* Layout */
-        .container { max-width: 720px; margin: 0 auto; padding: 0 1rem; }
+        /* App shell — full viewport height */
+        .app-shell {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
         header {
             background: #fff;
             border-bottom: 1px solid #e5e5e5;
-            padding: 0.75rem 0;
-            margin-bottom: 1.5rem;
-        }
-        header .container {
+            padding: 0.6rem 1.25rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
         }
         header h1 { font-size: 1.25rem; }
         header h1 a { color: #1a1a1a; }
         header h1 a:hover { text-decoration: none; }
+        .header-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+        /* Two-panel layout */
+        .panels {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+        .main-panel {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 2rem;
+            min-width: 0;
+        }
+
+        /* Right sidebar */
+        .sidebar {
+            width: 300px;
+            min-width: 260px;
+            max-width: 340px;
+            background: #fff;
+            border-left: 1px solid #e5e5e5;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 0.75rem 0.75rem;
+            border-bottom: 1px solid #e5e5e5;
+            flex-shrink: 0;
+        }
+        .sidebar-search {
+            width: 100%;
+            padding: 0.4rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-family: inherit;
+        }
+        .sidebar-search:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+        }
+        .sidebar-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+        .sidebar-item {
+            display: block;
+            padding: 0.6rem 0.75rem;
+            border-bottom: 1px solid #f0f0f0;
+            color: #1a1a1a;
+            text-decoration: none;
+            transition: background 0.15s;
+        }
+        .sidebar-item:hover {
+            background: #f5f5f5;
+            text-decoration: none;
+        }
+        .sidebar-item.active {
+            background: #eff6ff;
+            border-left: 3px solid #2563eb;
+            padding-left: calc(0.75rem - 3px);
+        }
+        .sidebar-item-title {
+            font-weight: 500;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sidebar-item-date {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.1rem;
+        }
+        .sidebar-empty {
+            padding: 1.5rem 1rem;
+            color: #6b7280;
+            text-align: center;
+            font-size: 0.875rem;
+        }
 
         /* Buttons */
         .btn {
@@ -42,6 +131,7 @@
             border: none;
             cursor: pointer;
             text-decoration: none;
+            line-height: 1.4;
         }
         .btn:hover { text-decoration: none; opacity: 0.9; }
         .btn-primary { background: #2563eb; color: #fff; }
@@ -58,7 +148,7 @@
         }
 
         /* Forms */
-        input[type="text"], textarea {
+        input[type="text"], input[type="password"], textarea {
             width: 100%;
             padding: 0.5rem 0.75rem;
             border: 1px solid #d1d5db;
@@ -66,12 +156,15 @@
             font-size: 1rem;
             font-family: inherit;
         }
-        input[type="text"]:focus, textarea:focus {
+        input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
             outline: none;
             border-color: #2563eb;
             box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
         }
-        textarea { font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace; font-size: 0.9rem; }
+        textarea {
+            font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+            font-size: 0.9rem;
+        }
         label { display: block; font-weight: 500; margin-bottom: 0.25rem; }
         .form-group { margin-bottom: 1rem; }
 
@@ -79,6 +172,9 @@
         .md-content h1, .md-content h2, .md-content h3,
         .md-content h4, .md-content h5, .md-content h6 {
             margin-top: 1.25em; margin-bottom: 0.5em;
+        }
+        .md-content h1:first-child, .md-content h2:first-child, .md-content h3:first-child {
+            margin-top: 0;
         }
         .md-content p { margin-bottom: 0.75em; }
         .md-content pre {
@@ -117,23 +213,118 @@
         .md-content ul, .md-content ol { margin-bottom: 0.75em; padding-left: 1.5em; }
         .md-content img { max-width: 100%; }
 
+        /* Login page */
+        .login-container {
+            max-width: 360px;
+            margin: 4rem auto;
+            padding: 0 1rem;
+        }
+        .login-card {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            padding: 2rem;
+        }
+        .login-card h2 {
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .flash-error {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+
         /* Utilities */
         .text-muted { color: #6b7280; font-size: 0.875rem; }
         .mt-1 { margin-top: 0.5rem; }
         .mt-2 { margin-top: 1rem; }
         .flex-between { display: flex; justify-content: space-between; align-items: center; }
         .gap-sm > * + * { margin-left: 0.5rem; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .panels {
+                flex-direction: column;
+            }
+            .sidebar {
+                width: 100%;
+                max-width: 100%;
+                min-width: 100%;
+                border-left: none;
+                border-top: 1px solid #e5e5e5;
+                max-height: 40vh;
+                order: 2;
+            }
+            .main-panel {
+                order: 1;
+                padding: 1rem;
+            }
+        }
     </style>
 </head>
 <body>
-    <header>
-        <div class="container">
+    <div class="app-shell">
+        <header>
             <h1><a href="/notes">Notes</a></h1>
-            <a href="/notes/new" class="btn btn-primary">+ New Note</a>
+            {% if current_user.is_authenticated %}
+            <div class="header-actions">
+                <a href="/notes/new" class="btn btn-primary">+ New Note</a>
+                <a href="/logout" class="btn btn-secondary">Logout</a>
+            </div>
+            {% endif %}
+        </header>
+
+        {% block body %}
+        <div class="panels">
+            <div class="main-panel">
+                {% block content %}{% endblock %}
+            </div>
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <input type="text" class="sidebar-search"
+                           placeholder="Filter notes..."
+                           id="sidebar-search"
+                           autocomplete="off">
+                </div>
+                <div class="sidebar-list" id="sidebar-list">
+                    {% for note in sidebar_notes %}
+                    <a href="/notes/{{ note.slug }}"
+                       class="sidebar-item{% if active_slug is defined and active_slug == note.slug %} active{% endif %}"
+                       data-title="{{ note.title|lower }}"
+                       data-body="{{ note.body|lower|truncate(200, true, '') }}">
+                        <div class="sidebar-item-title">{{ note.title }}</div>
+                        <div class="sidebar-item-date">{{ note.modified|format_date }}</div>
+                    </a>
+                    {% endfor %}
+                    {% if not sidebar_notes %}
+                    <div class="sidebar-empty">No notes yet</div>
+                    {% endif %}
+                </div>
+            </aside>
         </div>
-    </header>
-    <main class="container">
-        {% block content %}{% endblock %}
-    </main>
+        {% endblock %}
+    </div>
+
+    <script>
+    (function() {
+        var search = document.getElementById('sidebar-search');
+        if (!search) return;
+        search.addEventListener('input', function() {
+            var q = this.value.toLowerCase();
+            var items = document.querySelectorAll('.sidebar-item');
+            items.forEach(function(item) {
+                var title = item.getAttribute('data-title') || '';
+                var body = item.getAttribute('data-body') || '';
+                item.style.display =
+                    (title.indexOf(q) !== -1 || body.indexOf(q) !== -1) ? '' : 'none';
+            });
+        });
+    })();
+    </script>
 </body>
 </html>
