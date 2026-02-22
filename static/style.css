@@ -285,6 +285,40 @@ html, body {
     border-bottom: 1px solid var(--border-light);
 }
 
+/* --- Table of Contents --- */
+
+.note-toc {
+    background: var(--bg-sidebar);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+
+.note-toc-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.note-toc-item {
+    display: block;
+    padding: 4px 0;
+    font-size: 15px;
+    color: var(--link);
+    text-decoration: none;
+}
+
+.note-toc-item:hover { text-decoration: underline; }
+
+.note-toc-sub {
+    padding-left: 16px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
 /* --- Note Content (plain text, no markdown) --- */
 
 .note-content {

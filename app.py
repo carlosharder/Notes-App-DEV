@@ -231,6 +231,8 @@ def render_note(text, slug=None):
     lines = text.split('\n')
     html_parts = []
     in_checklist = False
+    toc_entries = []
+    section_counter = 0
 
     for i, line in enumerate(lines):
         stripped = line.strip()
@@ -241,9 +243,12 @@ def render_note(text, slug=None):
             if in_checklist:
                 html_parts.append('</ul>')
                 in_checklist = False
+            section_counter += 1
+            section_id = f's-{section_counter}'
+            toc_entries.append(('section', section_match.group(1).strip(), section_id))
             content = str(html_escape(section_match.group(1)))
             content = resolve_wiki_links(content)
-            html_parts.append(f'<div class="note-section">{content}</div>')
+            html_parts.append(f'<div class="note-section" id="{section_id}">{content}</div>')
             continue
 
         # Sub-section heading
@@ -252,9 +257,12 @@ def render_note(text, slug=None):
             if in_checklist:
                 html_parts.append('</ul>')
                 in_checklist = False
+            section_counter += 1
+            section_id = f's-{section_counter}'
+            toc_entries.append(('subsection', subsection_match.group(1).strip(), section_id))
             content = str(html_escape(subsection_match.group(1)))
             content = resolve_wiki_links(content)
-            html_parts.append(f'<div class="note-subsection">{content}</div>')
+            html_parts.append(f'<div class="note-subsection" id="{section_id}">{content}</div>')
             continue
 
         # Checklist item (unchecked)
@@ -320,6 +328,15 @@ def render_note(text, slug=None):
 
     if in_checklist:
         html_parts.append('</ul>')
+
+    # Prepend Table of Contents if any sections exist
+    if toc_entries:
+        toc_html = '<nav class="note-toc"><div class="note-toc-title">Contents</div>'
+        for level, text, sid in toc_entries:
+            css = 'note-toc-item' + (' note-toc-sub' if level == 'subsection' else '')
+            toc_html += f'<a class="{css}" href="#{sid}">{html_escape(text)}</a>'
+        toc_html += '</nav>'
+        html_parts.insert(0, toc_html)
 
     return '\n'.join(html_parts)
 
