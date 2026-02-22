@@ -4,9 +4,12 @@ import glob
 import json
 from datetime import datetime
 from markupsafe import escape as html_escape
+import shutil
 from flask import (
     Flask, render_template, request, redirect, url_for, abort, flash, jsonify,
+    send_from_directory,
 )
+from werkzeug.utils import secure_filename
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user,
@@ -15,6 +18,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB upload limit
 
 NOTES_DIR = os.environ.get(
     'NOTES_DIR',
@@ -281,6 +285,24 @@ def render_note(text, slug=None):
             )
             continue
 
+        # Audio embed
+        audio_match = re.match(r'^\[audio:(.+?)\]$', stripped, re.IGNORECASE)
+        if audio_match:
+            if in_checklist:
+                html_parts.append('</ul>')
+                in_checklist = False
+            filename = audio_match.group(1).strip()
+            safe_name = str(html_escape(filename))
+            html_parts.append(
+                f'<div class="note-audio">'
+                f'<div class="note-audio-name">{safe_name}</div>'
+                f'<audio controls preload="metadata">'
+                f'<source src="/api/audio/{slug}/{filename}" type="audio/mpeg">'
+                f'Your browser does not support audio playback.'
+                f'</audio></div>'
+            )
+            continue
+
         # Close checklist if we left it
         if in_checklist:
             html_parts.append('</ul>')
@@ -441,6 +463,12 @@ def api_note_update(slug):
     if new_slug != slug:
         os.remove(filepath)
         remove_index_entry(slug)
+        # Rename media directory if it exists
+        old_media = os.path.join(NOTES_DIR, 'media', slug)
+        new_media = os.path.join(NOTES_DIR, 'media', new_slug)
+        if os.path.isdir(old_media):
+            os.makedirs(os.path.dirname(new_media), exist_ok=True)
+            os.rename(old_media, new_media)
 
     write_note(new_slug, title, body, note['created'], now)
     update_index_entry(new_slug, title, note['created'], now, body)
@@ -454,6 +482,10 @@ def api_note_delete(slug):
     filepath = os.path.join(NOTES_DIR, f'{slug}.md')
     if os.path.isfile(filepath):
         os.remove(filepath)
+    # Also delete any attached audio files
+    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    if os.path.isdir(media_dir):
+        shutil.rmtree(media_dir)
     remove_index_entry(slug)
     return jsonify({'ok': True})
 
@@ -495,6 +527,91 @@ def api_note_titles():
     ]
     titles.sort(key=lambda t: t['title'].lower())
     return jsonify(titles)
+
+
+# --- Audio API ---
+
+ALLOWED_AUDIO_EXT = {'.mp3'}
+
+
+@app.route('/api/notes/<slug>/audio', methods=['POST'])
+@login_required
+def api_audio_upload(slug):
+    """Upload an MP3 file attached to a note."""
+    filepath = os.path.join(NOTES_DIR, f'{slug}.md')
+    if not os.path.isfile(filepath):
+        return jsonify({'error': 'Note not found'}), 404
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({'error': 'Empty filename'}), 400
+
+    filename = secure_filename(f.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in ALLOWED_AUDIO_EXT:
+        return jsonify({'error': 'Only .mp3 files are allowed'}), 400
+
+    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    os.makedirs(media_dir, exist_ok=True)
+
+    dest = os.path.join(media_dir, filename)
+    # Avoid overwriting — append number if exists
+    base, ext = os.path.splitext(filename)
+    counter = 2
+    while os.path.exists(dest):
+        filename = f'{base}-{counter}{ext}'
+        dest = os.path.join(media_dir, filename)
+        counter += 1
+
+    f.save(dest)
+    return jsonify({'filename': filename}), 201
+
+
+@app.route('/api/audio/<slug>/<filename>')
+@login_required
+def api_audio_serve(slug, filename):
+    """Serve an MP3 file for playback."""
+    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    safe_name = secure_filename(filename)
+    if not os.path.isfile(os.path.join(media_dir, safe_name)):
+        return jsonify({'error': 'Audio not found'}), 404
+    return send_from_directory(media_dir, safe_name, mimetype='audio/mpeg')
+
+
+@app.route('/api/notes/<slug>/audio/<filename>', methods=['DELETE'])
+@login_required
+def api_audio_delete(slug, filename):
+    """Delete a specific MP3 attached to a note."""
+    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    safe_name = secure_filename(filename)
+    fpath = os.path.join(media_dir, safe_name)
+    if os.path.isfile(fpath):
+        os.remove(fpath)
+        # Remove empty media dir
+        if os.path.isdir(media_dir) and not os.listdir(media_dir):
+            os.rmdir(media_dir)
+        return jsonify({'ok': True})
+    return jsonify({'error': 'File not found'}), 404
+
+
+@app.route('/api/notes/<slug>/audio')
+@login_required
+def api_audio_list(slug):
+    """List all MP3s attached to a note."""
+    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    files = []
+    if os.path.isdir(media_dir):
+        for fname in sorted(os.listdir(media_dir)):
+            if fname.lower().endswith('.mp3'):
+                fpath = os.path.join(media_dir, fname)
+                files.append({
+                    'filename': fname,
+                    'size': os.path.getsize(fpath),
+                })
+    return jsonify(files)
 
 
 # --- Startup ---

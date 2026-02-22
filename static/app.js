@@ -205,6 +205,11 @@
                         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>' +
                         ' Link' +
                     '</button>' +
+                    '<span class="toolbar-divider"></span>' +
+                    '<button type="button" id="toolbar-audio" title="Attach MP3 audio">' +
+                        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' +
+                        ' Audio' +
+                    '</button>' +
                 '</div>' +
                 '<textarea class="note-body-input" id="editor-body" placeholder="Start writing...">' + escapeHtml(note.body) + '</textarea>' +
             '</div>';
@@ -257,6 +262,51 @@
             insertAtCursor(bodyInput, '[[');
             bodyInput.focus();
             handleAutocomplete(bodyInput);
+        });
+
+        // Audio upload button
+        document.getElementById('toolbar-audio').addEventListener('click', () => {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.mp3,audio/mpeg';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+
+            fileInput.addEventListener('change', async () => {
+                const file = fileInput.files[0];
+                if (!file) return;
+
+                // Show uploading indicator
+                showSaveIndicator('saving');
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const resp = await fetch('/api/notes/' + currentSlug + '/audio', {
+                        method: 'POST',
+                        body: formData,
+                    });
+                    if (!resp.ok) {
+                        const err = await resp.json();
+                        alert('Upload failed: ' + (err.error || 'Unknown error'));
+                        showSaveIndicator('error');
+                        return;
+                    }
+                    const data = await resp.json();
+
+                    // Insert [audio:filename.mp3] at cursor
+                    insertAtCursor(bodyInput, '[audio:' + data.filename + ']');
+                    showSaveIndicator('saved');
+                } catch (err) {
+                    console.error('Audio upload failed:', err);
+                    showSaveIndicator('error');
+                }
+
+                fileInput.remove();
+            });
+
+            fileInput.click();
         });
 
         bodyInput.focus();
