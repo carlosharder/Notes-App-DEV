@@ -1399,15 +1399,6 @@
     });
 
     document.addEventListener('click', (e) => {
-        // TOC navigation — smooth scroll
-        const tocLink = e.target.closest('.note-toc a');
-        if (tocLink) {
-            e.preventDefault();
-            const target = document.getElementById(tocLink.getAttribute('href').substring(1));
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            return;
-        }
-        // Wiki-link navigation (existing)
         const wikiLink = e.target.closest('.wiki-link[data-slug]');
         if (wikiLink) {
             e.preventDefault();
