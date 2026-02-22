@@ -2,329 +2,80 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Notes{% endblock %}</title>
-    <style>
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            line-height: 1.6;
-            color: #1a1a1a;
-            background: #f5f5f5;
-        }
-        a { color: #2563eb; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-
-        /* App shell — full viewport height */
-        .app-shell {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-
-        /* Header */
-        header {
-            background: #fff;
-            border-bottom: 1px solid #e5e5e5;
-            padding: 0.6rem 1.25rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-shrink: 0;
-        }
-        header h1 { font-size: 1.25rem; }
-        header h1 a { color: #1a1a1a; }
-        header h1 a:hover { text-decoration: none; }
-        .header-actions { display: flex; align-items: center; gap: 0.5rem; }
-
-        /* Two-panel layout */
-        .panels {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-        }
-        .main-panel {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1.5rem 2rem;
-            min-width: 0;
-        }
-
-        /* Right sidebar */
-        .sidebar {
-            width: 300px;
-            min-width: 260px;
-            max-width: 340px;
-            background: #fff;
-            border-left: 1px solid #e5e5e5;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            flex-shrink: 0;
-        }
-        .sidebar-header {
-            padding: 0.75rem 0.75rem;
-            border-bottom: 1px solid #e5e5e5;
-            flex-shrink: 0;
-        }
-        .sidebar-search {
-            width: 100%;
-            padding: 0.4rem 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-family: inherit;
-        }
-        .sidebar-search:focus {
-            outline: none;
-            border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
-        }
-        .sidebar-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0;
-        }
-        .sidebar-item {
-            display: block;
-            padding: 0.6rem 0.75rem;
-            border-bottom: 1px solid #f0f0f0;
-            color: #1a1a1a;
-            text-decoration: none;
-            transition: background 0.15s;
-        }
-        .sidebar-item:hover {
-            background: #f5f5f5;
-            text-decoration: none;
-        }
-        .sidebar-item.active {
-            background: #eff6ff;
-            border-left: 3px solid #2563eb;
-            padding-left: calc(0.75rem - 3px);
-        }
-        .sidebar-item-title {
-            font-weight: 500;
-            font-size: 0.9rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .sidebar-item-date {
-            font-size: 0.75rem;
-            color: #6b7280;
-            margin-top: 0.1rem;
-        }
-        .sidebar-empty {
-            padding: 1.5rem 1rem;
-            color: #6b7280;
-            text-align: center;
-            font-size: 0.875rem;
-        }
-
-        /* Buttons */
-        .btn {
-            display: inline-block;
-            padding: 0.4rem 1rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            line-height: 1.4;
-        }
-        .btn:hover { text-decoration: none; opacity: 0.9; }
-        .btn-primary { background: #2563eb; color: #fff; }
-        .btn-danger { background: #dc2626; color: #fff; }
-        .btn-secondary { background: #e5e5e5; color: #1a1a1a; }
-
-        /* Cards */
-        .card {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            padding: 1rem 1.25rem;
-            margin-bottom: 0.75rem;
-        }
-
-        /* Forms */
-        input[type="text"], input[type="password"], textarea {
-            width: 100%;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-family: inherit;
-        }
-        input[type="text"]:focus, input[type="password"]:focus, textarea:focus {
-            outline: none;
-            border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
-        }
-        textarea {
-            font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
-            font-size: 0.9rem;
-        }
-        label { display: block; font-weight: 500; margin-bottom: 0.25rem; }
-        .form-group { margin-bottom: 1rem; }
-
-        /* Markdown content */
-        .md-content h1, .md-content h2, .md-content h3,
-        .md-content h4, .md-content h5, .md-content h6 {
-            margin-top: 1.25em; margin-bottom: 0.5em;
-        }
-        .md-content h1:first-child, .md-content h2:first-child, .md-content h3:first-child {
-            margin-top: 0;
-        }
-        .md-content p { margin-bottom: 0.75em; }
-        .md-content pre {
-            background: #f0f0f0;
-            padding: 0.75rem 1rem;
-            border-radius: 6px;
-            overflow-x: auto;
-            margin-bottom: 0.75em;
-        }
-        .md-content code {
-            font-family: "SF Mono", "Fira Code", Menlo, monospace;
-            font-size: 0.875em;
-        }
-        .md-content :not(pre) > code {
-            background: #f0f0f0;
-            padding: 0.15em 0.35em;
-            border-radius: 3px;
-        }
-        .md-content blockquote {
-            border-left: 3px solid #2563eb;
-            padding-left: 1rem;
-            color: #555;
-            margin-bottom: 0.75em;
-        }
-        .md-content table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-bottom: 0.75em;
-        }
-        .md-content th, .md-content td {
-            border: 1px solid #d1d5db;
-            padding: 0.4rem 0.75rem;
-            text-align: left;
-        }
-        .md-content th { background: #f5f5f5; font-weight: 600; }
-        .md-content ul, .md-content ol { margin-bottom: 0.75em; padding-left: 1.5em; }
-        .md-content img { max-width: 100%; }
-
-        /* Login page */
-        .login-container {
-            max-width: 360px;
-            margin: 4rem auto;
-            padding: 0 1rem;
-        }
-        .login-card {
-            background: #fff;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-            padding: 2rem;
-        }
-        .login-card h2 {
-            margin-bottom: 1.5rem;
-            text-align: center;
-        }
-        .flash-error {
-            background: #fef2f2;
-            color: #dc2626;
-            border: 1px solid #fecaca;
-            border-radius: 6px;
-            padding: 0.5rem 0.75rem;
-            margin-bottom: 1rem;
-            font-size: 0.875rem;
-        }
-
-        /* Utilities */
-        .text-muted { color: #6b7280; font-size: 0.875rem; }
-        .mt-1 { margin-top: 0.5rem; }
-        .mt-2 { margin-top: 1rem; }
-        .flex-between { display: flex; justify-content: space-between; align-items: center; }
-        .gap-sm > * + * { margin-left: 0.5rem; }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .panels {
-                flex-direction: column;
-            }
-            .sidebar {
-                width: 100%;
-                max-width: 100%;
-                min-width: 100%;
-                border-left: none;
-                border-top: 1px solid #e5e5e5;
-                max-height: 40vh;
-                order: 2;
-            }
-            .main-panel {
-                order: 1;
-                padding: 1rem;
-            }
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#f2f1ed">
+    <title>Notes</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
+<body data-initial-slug="{{ initial_slug|default('', true) }}">
     <div class="app-shell">
-        <header>
-            <h1><a href="/notes">Notes</a></h1>
-            {% if current_user.is_authenticated %}
-            <div class="header-actions">
-                <a href="/notes/new" class="btn btn-primary">+ New Note</a>
-                <a href="/logout" class="btn btn-secondary">Logout</a>
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">Notes</span>
+                <div class="sidebar-actions">
+                    <button class="icon-btn" id="new-note-btn" title="New Note (Ctrl+N)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 5v14M5 12h14"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            {% endif %}
-        </header>
+            <div class="sidebar-search">
+                <input type="search" id="sidebar-search" placeholder="Search" autocomplete="off">
+            </div>
+            <div class="sidebar-list" id="sidebar-list">
+                <!-- Loaded via JS -->
+            </div>
+            <div class="sidebar-footer">
+                <span class="note-count" id="sidebar-count"></span>
+                <a href="/logout" class="icon-btn" title="Logout" style="color: var(--text-tertiary); text-decoration: none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                </a>
+            </div>
+        </aside>
 
-        {% block body %}
-        <div class="panels">
-            <div class="main-panel">
-                {% block content %}{% endblock %}
+        <!-- Content Panel -->
+        <main class="content-panel">
+            <div class="content-toolbar">
+                <div class="toolbar-left">
+                    <button class="icon-btn mobile-back-btn" id="mobile-back-btn" title="Back">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <span class="save-indicator" id="save-indicator"></span>
+                </div>
+                <div class="toolbar-right">
+                    <button class="icon-btn" id="edit-btn" title="Edit (Ctrl+E)" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                    </button>
+                    <button class="icon-btn danger" id="delete-btn" title="Delete" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <aside class="sidebar">
-                <div class="sidebar-header">
-                    <input type="text" class="sidebar-search"
-                           placeholder="Filter notes..."
-                           id="sidebar-search"
-                           autocomplete="off">
-                </div>
-                <div class="sidebar-list" id="sidebar-list">
-                    {% for note in sidebar_notes %}
-                    <a href="/notes/{{ note.slug }}"
-                       class="sidebar-item{% if active_slug is defined and active_slug == note.slug %} active{% endif %}"
-                       data-title="{{ note.title|lower }}"
-                       data-body="{{ note.body|lower|truncate(200, true, '') }}">
-                        <div class="sidebar-item-title">{{ note.title }}</div>
-                        <div class="sidebar-item-date">{{ note.modified|format_date }}</div>
-                    </a>
-                    {% endfor %}
-                    {% if not sidebar_notes %}
-                    <div class="sidebar-empty">No notes yet</div>
-                    {% endif %}
-                </div>
-            </aside>
-        </div>
-        {% endblock %}
+            <div class="content-body" id="content-body">
+                <!-- Loaded via JS -->
+            </div>
+        </main>
     </div>
 
-    <script>
-    (function() {
-        var search = document.getElementById('sidebar-search');
-        if (!search) return;
-        search.addEventListener('input', function() {
-            var q = this.value.toLowerCase();
-            var items = document.querySelectorAll('.sidebar-item');
-            items.forEach(function(item) {
-                var title = item.getAttribute('data-title') || '';
-                var body = item.getAttribute('data-body') || '';
-                item.style.display =
-                    (title.indexOf(q) !== -1 || body.indexOf(q) !== -1) ? '' : 'none';
-            });
-        });
-    })();
-    </script>
+    <!-- Wiki-link autocomplete dropdown -->
+    <div class="link-autocomplete" id="link-autocomplete"></div>
+
+    <script src="/static/app.js"></script>
 </body>
 </html>
