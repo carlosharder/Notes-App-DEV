@@ -1522,4 +1522,40 @@
 
     init();
 
+    // =====================================================================
+    // Service Worker Registration
+    // =====================================================================
+
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(function(reg) {
+                console.log('SW registered, scope:', reg.scope);
+            })
+            .catch(function(err) {
+                console.error('SW registration failed:', err);
+            });
+    }
+
+    // =====================================================================
+    // Offline Indicator
+    // =====================================================================
+
+    function updateOnlineStatus() {
+        var indicator = document.getElementById('offline-indicator');
+        if (!navigator.onLine) {
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.id = 'offline-indicator';
+                indicator.textContent = 'Offline \u2014 changes won\u2019t be saved';
+                document.body.appendChild(indicator);
+            }
+        } else if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
+
 })();

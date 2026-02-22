@@ -375,6 +375,12 @@ def note_view(slug):
     return render_template('base.html', initial_slug=slug)
 
 
+@app.route('/service-worker.js')
+def service_worker():
+    return send_from_directory(app.static_folder, 'service-worker.js',
+                               mimetype='application/javascript')
+
+
 # --- API Routes ---
 
 @app.route('/api/notes')
