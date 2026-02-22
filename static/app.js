@@ -1,4 +1,4 @@
-/* Apple Notes — Client-Side Application */
+/* Apple Notes — Client-Side Application (WYSIWYG Editor) */
 
 (function () {
     'use strict';
@@ -129,7 +129,327 @@
         }, SEARCH_DEBOUNCE);
     });
 
-    // --- Note Operations ---
+    // =====================================================================
+    // WYSIWYG: Markup <-> Editable HTML converters
+    // =====================================================================
+
+    /**
+     * Convert raw markup text to editable HTML blocks for contenteditable.
+     * Each line becomes a <div> with data-block attribute.
+     */
+    function markupToEditableHTML(bodyText, slug) {
+        if (!bodyText && bodyText !== '') return '<div class="note-line" data-block="text"><br></div>';
+
+        const lines = bodyText.split('\n');
+        const parts = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const stripped = line.trim();
+
+            // Section heading
+            const sectionMatch = stripped.match(/^\[section\]\s*(.*)/i);
+            if (sectionMatch) {
+                const content = sectionMatch[1] || '';
+                parts.push('<div class="note-section" data-block="section">' + renderInlineEditable(content) + (content ? '' : '<br>') + '</div>');
+                continue;
+            }
+
+            // Sub-section heading
+            const subsectionMatch = stripped.match(/^\[subsection\]\s*(.*)/i);
+            if (subsectionMatch) {
+                const content = subsectionMatch[1] || '';
+                parts.push('<div class="note-subsection" data-block="subsection">' + renderInlineEditable(content) + (content ? '' : '<br>') + '</div>');
+                continue;
+            }
+
+            // Checklist item (unchecked)
+            const checkMatch = stripped.match(/^[-*]\s*\[ \]\s*(.*)/);
+            if (checkMatch) {
+                const content = checkMatch[1] || '';
+                parts.push(
+                    '<div class="note-check-item" data-block="check" data-checked="false">' +
+                    '<input type="checkbox" class="note-checkbox-edit">' +
+                    '<span class="check-text">' + renderInlineEditable(content) + (content ? '' : '<br>') + '</span></div>'
+                );
+                continue;
+            }
+
+            // Checklist item (checked)
+            const checkxMatch = stripped.match(/^[-*]\s*\[x\]\s*(.*)/i);
+            if (checkxMatch) {
+                const content = checkxMatch[1] || '';
+                parts.push(
+                    '<div class="note-check-item checked" data-block="check" data-checked="true">' +
+                    '<input type="checkbox" class="note-checkbox-edit" checked>' +
+                    '<span class="check-text">' + renderInlineEditable(content) + (content ? '' : '<br>') + '</span></div>'
+                );
+                continue;
+            }
+
+            // Audio embed
+            const audioMatch = stripped.match(/^\[audio:(.+?)\]$/i);
+            if (audioMatch) {
+                const filename = audioMatch[1].trim();
+                parts.push(
+                    '<div class="note-audio-block" data-block="audio" data-filename="' + escapeAttr(filename) + '" contenteditable="false">' +
+                    '<div class="note-audio-name">' + escapeHtml(filename) + '</div>' +
+                    '<audio controls preload="metadata">' +
+                    '<source src="/api/audio/' + slug + '/' + encodeURIComponent(filename) + '" type="audio/mpeg">' +
+                    '</audio></div>'
+                );
+                continue;
+            }
+
+            // Empty line
+            if (!stripped) {
+                parts.push('<div class="note-blank" data-block="blank"><br></div>');
+                continue;
+            }
+
+            // Regular text
+            parts.push('<div class="note-line" data-block="text">' + renderInlineEditable(stripped) + '</div>');
+        }
+
+        if (parts.length === 0) {
+            return '<div class="note-line" data-block="text"><br></div>';
+        }
+
+        return parts.join('');
+    }
+
+    /**
+     * Render inline content for editable blocks.
+     * Converts [[wiki links]] to styled spans.
+     */
+    function renderInlineEditable(text) {
+        if (!text) return '';
+        // Escape HTML first
+        let html = escapeHtml(text);
+        // Replace [[Title]] with styled non-editable spans
+        html = html.replace(/\[\[(.+?)\]\]/g, function(match, title) {
+            return '<span class="wiki-link-edit" data-link-title="' + escapeAttr(title) + '" contenteditable="false">' + escapeHtml(title) + '</span>';
+        });
+        return html;
+    }
+
+    /**
+     * Serialize contenteditable DOM back to markup text for storage.
+     */
+    function editableHTMLToMarkup(editorDiv) {
+        const lines = [];
+        const children = editorDiv.children;
+
+        for (let i = 0; i < children.length; i++) {
+            const block = children[i];
+            const type = block.dataset.block || 'text';
+
+            switch (type) {
+                case 'section':
+                    lines.push('[section] ' + getBlockText(block));
+                    break;
+                case 'subsection':
+                    lines.push('[subsection] ' + getBlockText(block));
+                    break;
+                case 'check': {
+                    const checked = block.querySelector('input[type="checkbox"]');
+                    const marker = (checked && checked.checked) ? '- [x] ' : '- [ ] ';
+                    const textEl = block.querySelector('.check-text');
+                    lines.push(marker + getBlockText(textEl || block));
+                    break;
+                }
+                case 'audio':
+                    lines.push('[audio:' + (block.dataset.filename || '') + ']');
+                    break;
+                case 'blank':
+                    lines.push('');
+                    break;
+                case 'text':
+                default:
+                    lines.push(getBlockText(block));
+                    break;
+            }
+        }
+
+        return lines.join('\n');
+    }
+
+    /**
+     * Extract text from a block element, reconstructing [[wiki links]].
+     */
+    function getBlockText(el) {
+        let text = '';
+        for (let i = 0; i < el.childNodes.length; i++) {
+            const node = el.childNodes[i];
+            if (node.nodeType === Node.TEXT_NODE) {
+                text += node.textContent;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.classList && node.classList.contains('wiki-link-edit')) {
+                    text += '[[' + (node.dataset.linkTitle || node.textContent) + ']]';
+                } else if (node.tagName === 'BR') {
+                    // skip trailing <br> in empty blocks
+                } else if (node.tagName === 'INPUT') {
+                    // skip checkbox inputs
+                } else if (node.classList && node.classList.contains('check-text')) {
+                    text += getBlockText(node);
+                } else {
+                    text += node.textContent;
+                }
+            }
+        }
+        return text;
+    }
+
+    // =====================================================================
+    // WYSIWYG: Contenteditable helpers
+    // =====================================================================
+
+    /**
+     * Get the block-level element (direct child of editorDiv) containing the cursor.
+     */
+    function getCurrentBlock(editorDiv) {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return null;
+        let node = sel.anchorNode;
+        if (!node) return null;
+        // Walk up to find direct child of editorDiv
+        while (node && node.parentNode !== editorDiv) {
+            node = node.parentNode;
+            if (!node) return null;
+        }
+        return (node && node.parentNode === editorDiv) ? node : null;
+    }
+
+    /**
+     * Place cursor at the end of an element.
+     */
+    function placeCursorIn(element) {
+        const range = document.createRange();
+        const sel = window.getSelection();
+
+        if (element.dataset.block === 'check') {
+            const textSpan = element.querySelector('.check-text');
+            if (textSpan) {
+                range.selectNodeContents(textSpan);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                return;
+            }
+        }
+
+        range.selectNodeContents(element);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    /**
+     * Place cursor at the start of an element.
+     */
+    function placeCursorAtStart(element) {
+        const range = document.createRange();
+        const sel = window.getSelection();
+
+        if (element.dataset.block === 'check') {
+            const textSpan = element.querySelector('.check-text');
+            if (textSpan) {
+                range.selectNodeContents(textSpan);
+                range.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(range);
+                return;
+            }
+        }
+
+        range.selectNodeContents(element);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    /**
+     * Check if cursor is at the very start of a block.
+     */
+    function isAtBlockStart(block) {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return false;
+        const range = sel.getRangeAt(0);
+        if (!range.collapsed) return false;
+
+        let container = range.startContainer;
+        let offset = range.startOffset;
+
+        // If cursor is in the block itself (not a child text node)
+        if (container === block && offset === 0) return true;
+
+        // For check items, check within .check-text
+        const textContainer = (block.dataset.block === 'check')
+            ? block.querySelector('.check-text')
+            : block;
+
+        if (!textContainer) return false;
+
+        // Walk to find if there's any text before the cursor
+        let foundText = false;
+        function walkBefore(node) {
+            if (node === container) {
+                if (node.nodeType === Node.TEXT_NODE && offset > 0) foundText = true;
+                return true; // stop
+            }
+            if (node.nodeType === Node.TEXT_NODE && node.textContent.length > 0) {
+                foundText = true;
+            }
+            for (let i = 0; i < node.childNodes.length; i++) {
+                if (node.childNodes[i].tagName === 'INPUT') continue; // skip checkbox
+                if (walkBefore(node.childNodes[i])) return true;
+            }
+            return false;
+        }
+        walkBefore(textContainer);
+        return !foundText;
+    }
+
+    /**
+     * Create a new empty block of the given type.
+     */
+    function createBlock(type) {
+        const div = document.createElement('div');
+        switch (type) {
+            case 'section':
+                div.className = 'note-section';
+                div.dataset.block = 'section';
+                div.innerHTML = '<br>';
+                break;
+            case 'subsection':
+                div.className = 'note-subsection';
+                div.dataset.block = 'subsection';
+                div.innerHTML = '<br>';
+                break;
+            case 'check':
+                div.className = 'note-check-item';
+                div.dataset.block = 'check';
+                div.dataset.checked = 'false';
+                div.innerHTML = '<input type="checkbox" class="note-checkbox-edit"><span class="check-text"><br></span>';
+                break;
+            case 'blank':
+                div.className = 'note-blank';
+                div.dataset.block = 'blank';
+                div.innerHTML = '<br>';
+                break;
+            case 'text':
+            default:
+                div.className = 'note-line';
+                div.dataset.block = 'text';
+                div.innerHTML = '<br>';
+                break;
+        }
+        return div;
+    }
+
+    // =====================================================================
+    // Note Operations
+    // =====================================================================
 
     async function openNote(slug) {
         if (isEditing && currentSlug) {
@@ -179,6 +499,10 @@
         updateToolbar();
     }
 
+    // =====================================================================
+    // WYSIWYG Editor
+    // =====================================================================
+
     function renderNoteEditor(note) {
         contentBody.innerHTML =
             '<div class="note-editor">' +
@@ -211,72 +535,126 @@
                         ' Audio' +
                     '</button>' +
                 '</div>' +
-                '<textarea class="note-body-input" id="editor-body" placeholder="Start writing...">' + escapeHtml(note.body) + '</textarea>' +
+                '<div class="note-body-editable" id="editor-body" contenteditable="true" data-placeholder="Start writing..."></div>' +
             '</div>';
 
         const titleInput = document.getElementById('editor-title');
-        const bodyInput = document.getElementById('editor-body');
+        const editorBody = document.getElementById('editor-body');
 
-        // Auto-save on input
+        // Initialize with converted content
+        editorBody.innerHTML = markupToEditableHTML(note.body, currentSlug);
+
+        // Ensure at least one block exists
+        ensureMinBlock(editorBody);
+
+        // --- Autosave ---
         titleInput.addEventListener('input', scheduleAutosave);
-        bodyInput.addEventListener('input', () => {
+        editorBody.addEventListener('input', function() {
+            ensureMinBlock(editorBody);
             scheduleAutosave();
-            handleAutocomplete(bodyInput);
+            handleAutocompleteEditable(editorBody);
         });
 
-        // Wiki-link autocomplete keyboard nav
-        bodyInput.addEventListener('keydown', (e) => {
+        // --- Keyboard handling ---
+        editorBody.addEventListener('keydown', function(e) {
+            // Autocomplete navigation
             if (autocompleteEl.classList.contains('visible')) {
                 const items = autocompleteEl.querySelectorAll('.link-autocomplete-item');
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     autocompleteIdx = Math.min(autocompleteIdx + 1, items.length - 1);
                     updateAutocompleteSelection(items);
+                    return;
                 } else if (e.key === 'ArrowUp') {
                     e.preventDefault();
                     autocompleteIdx = Math.max(autocompleteIdx - 1, 0);
                     updateAutocompleteSelection(items);
+                    return;
                 } else if (e.key === 'Enter' && autocompleteIdx >= 0) {
                     e.preventDefault();
-                    insertAutocompleteSelection(bodyInput, items[autocompleteIdx].textContent);
+                    insertAutocompleteLinkEditable(items[autocompleteIdx].textContent);
+                    return;
                 } else if (e.key === 'Escape') {
                     hideAutocomplete();
+                    return;
+                }
+            }
+
+            // Enter key
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleEnterKey(editorBody);
+                return;
+            }
+
+            // Backspace at block start
+            if (e.key === 'Backspace') {
+                const block = getCurrentBlock(editorBody);
+                if (block && isAtBlockStart(block)) {
+                    e.preventDefault();
+                    handleBackspaceAtStart(editorBody, block);
+                    return;
                 }
             }
         });
 
-        // Toolbar buttons
-        document.getElementById('toolbar-section').addEventListener('click', () => {
-            setLinePrefix(bodyInput, '[section] ');
+        // --- Paste handling ---
+        editorBody.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            handlePaste(editorBody, text);
         });
-        document.getElementById('toolbar-subsection').addEventListener('click', () => {
-            setLinePrefix(bodyInput, '[subsection] ');
+
+        // --- Checkbox toggle in editor ---
+        editorBody.addEventListener('change', function(e) {
+            if (e.target.classList.contains('note-checkbox-edit')) {
+                const item = e.target.closest('[data-block="check"]');
+                if (item) {
+                    item.dataset.checked = e.target.checked ? 'true' : 'false';
+                    if (e.target.checked) {
+                        item.classList.add('checked');
+                    } else {
+                        item.classList.remove('checked');
+                    }
+                    scheduleAutosave();
+                }
+            }
         });
-        document.getElementById('toolbar-text').addEventListener('click', () => {
-            removeLinePrefix(bodyInput);
+
+        // --- Toolbar buttons ---
+        document.getElementById('toolbar-section').addEventListener('click', function() {
+            setBlockType(editorBody, 'section');
+            editorBody.focus();
         });
-        document.getElementById('toolbar-checklist').addEventListener('click', () => {
-            insertAtCursor(bodyInput, '- [ ] ');
+        document.getElementById('toolbar-subsection').addEventListener('click', function() {
+            setBlockType(editorBody, 'subsection');
+            editorBody.focus();
         });
-        document.getElementById('toolbar-link').addEventListener('click', () => {
-            insertAtCursor(bodyInput, '[[');
-            bodyInput.focus();
-            handleAutocomplete(bodyInput);
+        document.getElementById('toolbar-text').addEventListener('click', function() {
+            setBlockType(editorBody, 'text');
+            editorBody.focus();
+        });
+        document.getElementById('toolbar-checklist').addEventListener('click', function() {
+            insertChecklistItem(editorBody);
+        });
+        document.getElementById('toolbar-link').addEventListener('click', function() {
+            editorBody.focus();
+            document.execCommand('insertText', false, '[[');
+            handleAutocompleteEditable(editorBody);
         });
 
         // Audio upload button
-        document.getElementById('toolbar-audio').addEventListener('click', () => {
+        document.getElementById('toolbar-audio').addEventListener('click', function() {
             const fileInput = document.createElement('input');
             fileInput.type = 'file';
             fileInput.accept = '.mp3,audio/mpeg';
             fileInput.style.display = 'none';
             document.body.appendChild(fileInput);
 
-            fileInput.addEventListener('change', async () => {
+            fileInput.addEventListener('change', async function() {
                 const file = fileInput.files[0];
                 if (!file) return;
 
-                // Show uploading indicator
                 showSaveIndicator('saving');
 
                 const formData = new FormData();
@@ -294,10 +672,9 @@
                         return;
                     }
                     const data = await resp.json();
-
-                    // Insert [audio:filename.mp3] at cursor
-                    insertAtCursor(bodyInput, '[audio:' + data.filename + ']');
+                    insertAudioBlock(editorBody, currentSlug, data.filename);
                     showSaveIndicator('saved');
+                    scheduleAutosave();
                 } catch (err) {
                     console.error('Audio upload failed:', err);
                     showSaveIndicator('error');
@@ -309,19 +686,505 @@
             fileInput.click();
         });
 
-        bodyInput.focus();
+        editorBody.focus();
         updateToolbar();
     }
+
+    /**
+     * Ensure editor has at least one block.
+     */
+    function ensureMinBlock(editorDiv) {
+        if (editorDiv.children.length === 0) {
+            editorDiv.appendChild(createBlock('text'));
+        }
+    }
+
+    /**
+     * Change the block type of the current block (section/subsection/text).
+     */
+    function setBlockType(editorDiv, type) {
+        const block = getCurrentBlock(editorDiv);
+        if (!block) return;
+        if (block.dataset.block === 'audio') return; // don't convert audio
+
+        // If it's a check item, convert to text-type block
+        if (block.dataset.block === 'check') {
+            const textSpan = block.querySelector('.check-text');
+            const text = textSpan ? getBlockText(textSpan) : getBlockText(block);
+            const cb = block.querySelector('input');
+            if (cb) cb.remove();
+            if (textSpan) {
+                // Move text out of span
+                while (textSpan.firstChild) {
+                    block.insertBefore(textSpan.firstChild, textSpan);
+                }
+                textSpan.remove();
+            }
+            delete block.dataset.checked;
+        }
+
+        switch (type) {
+            case 'section':
+                block.className = 'note-section';
+                block.dataset.block = 'section';
+                break;
+            case 'subsection':
+                block.className = 'note-subsection';
+                block.dataset.block = 'subsection';
+                break;
+            case 'text':
+            default:
+                block.className = 'note-line';
+                block.dataset.block = 'text';
+                break;
+        }
+
+        scheduleAutosave();
+    }
+
+    /**
+     * Insert a new checklist item after the current block.
+     */
+    function insertChecklistItem(editorDiv) {
+        const block = getCurrentBlock(editorDiv);
+        const newBlock = createBlock('check');
+
+        if (block && block.nextSibling) {
+            editorDiv.insertBefore(newBlock, block.nextSibling);
+        } else {
+            editorDiv.appendChild(newBlock);
+        }
+
+        placeCursorIn(newBlock);
+        editorDiv.focus();
+        scheduleAutosave();
+    }
+
+    /**
+     * Insert an audio block after the current block.
+     */
+    function insertAudioBlock(editorDiv, slug, filename) {
+        const block = getCurrentBlock(editorDiv);
+        const audioBlock = document.createElement('div');
+        audioBlock.className = 'note-audio-block';
+        audioBlock.dataset.block = 'audio';
+        audioBlock.dataset.filename = filename;
+        audioBlock.contentEditable = 'false';
+        audioBlock.innerHTML =
+            '<div class="note-audio-name">' + escapeHtml(filename) + '</div>' +
+            '<audio controls preload="metadata">' +
+            '<source src="/api/audio/' + slug + '/' + encodeURIComponent(filename) + '" type="audio/mpeg">' +
+            '</audio>';
+
+        if (block && block.nextSibling) {
+            editorDiv.insertBefore(audioBlock, block.nextSibling);
+        } else {
+            editorDiv.appendChild(audioBlock);
+        }
+
+        // Add a blank line after audio for continued typing
+        const afterBlock = createBlock('text');
+        if (audioBlock.nextSibling) {
+            editorDiv.insertBefore(afterBlock, audioBlock.nextSibling);
+        } else {
+            editorDiv.appendChild(afterBlock);
+        }
+        placeCursorIn(afterBlock);
+    }
+
+    // =====================================================================
+    // Keyboard handlers
+    // =====================================================================
+
+    function handleEnterKey(editorDiv) {
+        const block = getCurrentBlock(editorDiv);
+        if (!block) {
+            const newBlock = createBlock('text');
+            editorDiv.appendChild(newBlock);
+            placeCursorIn(newBlock);
+            scheduleAutosave();
+            return;
+        }
+
+        const blockType = block.dataset.block;
+
+        // For checklist items
+        if (blockType === 'check') {
+            const textSpan = block.querySelector('.check-text');
+            const text = textSpan ? getBlockText(textSpan).trim() : '';
+
+            if (!text) {
+                // Empty checklist → convert to regular text
+                block.className = 'note-line';
+                block.dataset.block = 'text';
+                delete block.dataset.checked;
+                const cb = block.querySelector('input');
+                if (cb) cb.remove();
+                const span = block.querySelector('.check-text');
+                if (span) {
+                    while (span.firstChild) block.insertBefore(span.firstChild, span);
+                    span.remove();
+                }
+                block.innerHTML = '<br>';
+                placeCursorIn(block);
+                scheduleAutosave();
+                return;
+            }
+
+            // Split check item at cursor and create new check item
+            const sel = window.getSelection();
+            const range = sel.getRangeAt(0);
+
+            // Extract content after cursor within the text span
+            const afterRange = document.createRange();
+            afterRange.setStart(range.endContainer, range.endOffset);
+            afterRange.setEndAfter(textSpan.lastChild || textSpan);
+            const afterContent = afterRange.extractContents();
+
+            // Clean up current block's text span
+            if (!textSpan.textContent.trim() && !textSpan.querySelector('.wiki-link-edit')) {
+                textSpan.innerHTML = '<br>';
+            }
+
+            // Create new checklist item with extracted content
+            const newBlock = createBlock('check');
+            const newTextSpan = newBlock.querySelector('.check-text');
+            if (afterContent.textContent.trim() || afterContent.querySelector && afterContent.querySelector('.wiki-link-edit')) {
+                newTextSpan.innerHTML = '';
+                newTextSpan.appendChild(afterContent);
+            }
+
+            if (block.nextSibling) {
+                editorDiv.insertBefore(newBlock, block.nextSibling);
+            } else {
+                editorDiv.appendChild(newBlock);
+            }
+            placeCursorAtStart(newBlock);
+            scheduleAutosave();
+            return;
+        }
+
+        // For audio blocks — just create a text block after
+        if (blockType === 'audio') {
+            const newBlock = createBlock('text');
+            if (block.nextSibling) {
+                editorDiv.insertBefore(newBlock, block.nextSibling);
+            } else {
+                editorDiv.appendChild(newBlock);
+            }
+            placeCursorIn(newBlock);
+            scheduleAutosave();
+            return;
+        }
+
+        // For section/subsection/text/blank — split at cursor
+        const sel = window.getSelection();
+        const range = sel.getRangeAt(0);
+
+        // Extract content after cursor
+        const afterRange = document.createRange();
+        afterRange.setStart(range.endContainer, range.endOffset);
+        if (block.lastChild) {
+            afterRange.setEndAfter(block.lastChild);
+        } else {
+            afterRange.setEnd(block, block.childNodes.length);
+        }
+        const afterContent = afterRange.extractContents();
+
+        // If original block is now empty, add <br>
+        if (!block.textContent.trim() && !block.querySelector('.wiki-link-edit')) {
+            block.innerHTML = '<br>';
+        }
+
+        // Create new block (always regular text for Enter)
+        const newBlock = createBlock('text');
+        if (afterContent.textContent.trim() || (afterContent.querySelector && afterContent.querySelector('.wiki-link-edit'))) {
+            newBlock.innerHTML = '';
+            newBlock.appendChild(afterContent);
+        }
+
+        if (block.nextSibling) {
+            editorDiv.insertBefore(newBlock, block.nextSibling);
+        } else {
+            editorDiv.appendChild(newBlock);
+        }
+        placeCursorAtStart(newBlock);
+        scheduleAutosave();
+    }
+
+    function handleBackspaceAtStart(editorDiv, block) {
+        const blockType = block.dataset.block;
+
+        // Checklist → convert to regular text
+        if (blockType === 'check') {
+            const textSpan = block.querySelector('.check-text');
+            const frag = document.createDocumentFragment();
+            if (textSpan) {
+                while (textSpan.firstChild) frag.appendChild(textSpan.firstChild);
+            }
+            block.className = 'note-line';
+            block.dataset.block = 'text';
+            delete block.dataset.checked;
+            block.innerHTML = '';
+            if (frag.childNodes.length > 0 && !(frag.childNodes.length === 1 && frag.firstChild.tagName === 'BR')) {
+                block.appendChild(frag);
+            } else {
+                block.innerHTML = '<br>';
+            }
+            placeCursorAtStart(block);
+            scheduleAutosave();
+            return;
+        }
+
+        // Section/subsection → convert to regular text
+        if (blockType === 'section' || blockType === 'subsection') {
+            block.className = 'note-line';
+            block.dataset.block = 'text';
+            scheduleAutosave();
+            return;
+        }
+
+        // Regular text/blank → merge with previous block
+        const prev = block.previousElementSibling;
+        if (!prev) return; // first block, nothing to merge
+
+        if (prev.dataset.block === 'audio') {
+            // Can't merge into audio, just remove empty block
+            if (!block.textContent.trim()) {
+                block.remove();
+                scheduleAutosave();
+            }
+            return;
+        }
+
+        // Get the target element to merge into
+        let mergeTarget = prev;
+        if (prev.dataset.block === 'check') {
+            mergeTarget = prev.querySelector('.check-text') || prev;
+        }
+
+        // Remove <br> from target if it's the only content
+        if (mergeTarget.innerHTML.trim() === '<br>') {
+            mergeTarget.innerHTML = '';
+        }
+
+        const cursorOffset = mergeTarget.textContent.length;
+
+        // Move all children from current block to end of target
+        const frag = document.createDocumentFragment();
+        while (block.firstChild) {
+            if (block.firstChild.tagName === 'BR' && block.childNodes.length === 1) {
+                block.removeChild(block.firstChild);
+            } else {
+                frag.appendChild(block.firstChild);
+            }
+        }
+        mergeTarget.appendChild(frag);
+        block.remove();
+
+        // Place cursor at merge point
+        placeCursorAtTextOffset(mergeTarget, cursorOffset);
+        scheduleAutosave();
+    }
+
+    /**
+     * Place cursor at a specific text offset within an element.
+     */
+    function placeCursorAtTextOffset(element, targetOffset) {
+        const range = document.createRange();
+        const sel = window.getSelection();
+        let offset = 0;
+
+        function walk(node) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                if (offset + node.textContent.length >= targetOffset) {
+                    range.setStart(node, targetOffset - offset);
+                    range.collapse(true);
+                    return true;
+                }
+                offset += node.textContent.length;
+            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                if (node.tagName === 'BR') return false;
+                if (node.tagName === 'INPUT') return false;
+                for (let i = 0; i < node.childNodes.length; i++) {
+                    if (walk(node.childNodes[i])) return true;
+                }
+            }
+            return false;
+        }
+
+        if (!walk(element)) {
+            // Fallback: place at end
+            range.selectNodeContents(element);
+            range.collapse(false);
+        }
+
+        sel.removeAllRanges();
+        sel.addRange(range);
+    }
+
+    /**
+     * Handle paste: strip formatting and insert as plain text blocks.
+     */
+    function handlePaste(editorDiv, text) {
+        if (!text) return;
+
+        const lines = text.split('\n');
+
+        if (lines.length === 1) {
+            // Single line: just insert text
+            document.execCommand('insertText', false, lines[0]);
+            scheduleAutosave();
+            return;
+        }
+
+        // Multi-line paste: insert first line at cursor, create blocks for rest
+        document.execCommand('insertText', false, lines[0]);
+
+        const block = getCurrentBlock(editorDiv);
+        let insertAfter = block;
+
+        for (let i = 1; i < lines.length; i++) {
+            const newBlock = createBlock('text');
+            if (lines[i].trim()) {
+                newBlock.textContent = lines[i];
+            }
+            if (insertAfter && insertAfter.nextSibling) {
+                editorDiv.insertBefore(newBlock, insertAfter.nextSibling);
+            } else {
+                editorDiv.appendChild(newBlock);
+            }
+            insertAfter = newBlock;
+        }
+
+        if (insertAfter) {
+            placeCursorIn(insertAfter);
+        }
+        scheduleAutosave();
+    }
+
+    // =====================================================================
+    // Wiki-Link Autocomplete (contenteditable version)
+    // =====================================================================
+
+    function handleAutocompleteEditable(editorDiv) {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) { hideAutocomplete(); return; }
+
+        const range = sel.getRangeAt(0);
+        let textNode = range.startContainer;
+        if (textNode.nodeType !== Node.TEXT_NODE) { hideAutocomplete(); return; }
+
+        const textBefore = textNode.textContent.substring(0, range.startOffset);
+        const match = textBefore.match(/\[\[([^\[\]]*)$/);
+
+        if (match) {
+            const query = match[1].toLowerCase();
+            const filtered = noteTitles.filter(t =>
+                t.title.toLowerCase().includes(query) && t.slug !== currentSlug
+            ).slice(0, 8);
+
+            if (filtered.length > 0) {
+                showAutocompleteEditable(filtered);
+                return;
+            }
+        }
+
+        hideAutocomplete();
+    }
+
+    function showAutocompleteEditable(items) {
+        autocompleteIdx = 0;
+        autocompleteEl.innerHTML = '';
+
+        items.forEach((item, i) => {
+            const el = document.createElement('div');
+            el.className = 'link-autocomplete-item' + (i === 0 ? ' selected' : '');
+            el.textContent = item.title;
+            el.addEventListener('mousedown', function(e) {
+                e.preventDefault(); // prevent blur
+                insertAutocompleteLinkEditable(item.title);
+            });
+            autocompleteEl.appendChild(el);
+        });
+
+        // Position near cursor
+        const sel = window.getSelection();
+        if (sel.rangeCount) {
+            const r = sel.getRangeAt(0);
+            const rect = r.getBoundingClientRect();
+            autocompleteEl.style.left = rect.left + 'px';
+            autocompleteEl.style.top = (rect.bottom + 4) + 'px';
+        }
+
+        autocompleteEl.classList.add('visible');
+    }
+
+    function insertAutocompleteLinkEditable(title) {
+        const sel = window.getSelection();
+        if (!sel.rangeCount) return;
+
+        const range = sel.getRangeAt(0);
+        const textNode = range.startContainer;
+        if (textNode.nodeType !== Node.TEXT_NODE) return;
+
+        const textBefore = textNode.textContent.substring(0, range.startOffset);
+        const bracketPos = textBefore.lastIndexOf('[[');
+        if (bracketPos === -1) return;
+
+        const textAfter = textNode.textContent.substring(range.startOffset);
+        const beforeText = textBefore.substring(0, bracketPos);
+
+        // Create wiki-link span
+        const linkSpan = document.createElement('span');
+        linkSpan.className = 'wiki-link-edit';
+        linkSpan.dataset.linkTitle = title;
+        linkSpan.contentEditable = 'false';
+        linkSpan.textContent = title;
+
+        // Split and rebuild
+        const parent = textNode.parentNode;
+        textNode.textContent = beforeText;
+
+        const afterNode = document.createTextNode('\u200B' + textAfter); // zero-width space for cursor
+        parent.insertBefore(linkSpan, textNode.nextSibling);
+        parent.insertBefore(afterNode, linkSpan.nextSibling);
+
+        // Place cursor after the link
+        const newRange = document.createRange();
+        newRange.setStart(afterNode, 1); // after the zero-width space
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+
+        hideAutocomplete();
+        scheduleAutosave();
+    }
+
+    function hideAutocomplete() {
+        autocompleteEl.classList.remove('visible');
+        autocompleteIdx = -1;
+    }
+
+    function updateAutocompleteSelection(items) {
+        items.forEach((el, i) => {
+            el.classList.toggle('selected', i === autocompleteIdx);
+        });
+    }
+
+    // =====================================================================
+    // Save / Create / Delete / Toggle Edit
+    // =====================================================================
 
     async function saveCurrentNote() {
         if (!currentSlug || !isEditing) return;
 
         const titleInput = document.getElementById('editor-title');
-        const bodyInput = document.getElementById('editor-body');
-        if (!titleInput || !bodyInput) return;
+        const editorBody = document.getElementById('editor-body');
+        if (!titleInput || !editorBody) return;
 
         const title = titleInput.value.trim() || 'Untitled';
-        const body = bodyInput.value;
+        const body = editableHTMLToMarkup(editorBody);
 
         showSaveIndicator('saving');
 
@@ -362,33 +1225,25 @@
             });
             const data = await resp.json();
 
-            // Reload sidebar and open the note in edit mode
             currentPage = 1;
             allLoaded = false;
             await loadNotes(1, currentQuery, false);
             currentSlug = data.slug;
             isEditing = true;
 
-            // Fetch and show editor
             const noteResp = await fetch('/api/notes/' + data.slug);
             const note = await noteResp.json();
             renderNoteEditor(note);
 
-            // Select the title for quick rename
             const titleInput = document.getElementById('editor-title');
-            if (titleInput) {
-                titleInput.select();
-            }
+            if (titleInput) titleInput.select();
 
-            // Update URL
             history.pushState({ slug: data.slug }, '', '/notes/' + data.slug);
 
-            // Mobile: hide sidebar
             if (window.innerWidth <= 768) {
                 sidebar.classList.add('hidden');
             }
 
-            // Mark active
             document.querySelectorAll('.note-item').forEach(el => {
                 el.classList.toggle('active', el.dataset.slug === data.slug);
             });
@@ -400,7 +1255,6 @@
     async function deleteCurrentNote() {
         if (!currentSlug) return;
 
-        // Show confirmation dialog
         const overlay = document.createElement('div');
         overlay.className = 'confirm-overlay';
         overlay.innerHTML =
@@ -446,13 +1300,11 @@
 
     function toggleEdit() {
         if (isEditing) {
-            // Save and switch to view
             saveCurrentNote().then(() => {
                 isEditing = false;
                 openNote(currentSlug);
             });
         } else {
-            // Switch to edit
             isEditing = true;
             fetch('/api/notes/' + currentSlug)
                 .then(r => r.json())
@@ -460,16 +1312,14 @@
         }
     }
 
-    // --- Refresh sidebar item after save ---
-
+    // --- Refresh sidebar ---
     async function refreshSidebarNote(slug) {
         currentPage = 1;
         allLoaded = false;
         await loadNotes(1, currentQuery, false);
     }
 
-    // --- Toolbar ---
-
+    // --- Toolbar state ---
     function updateToolbar() {
         if (!editBtn || !deleteBtn) return;
 
@@ -519,7 +1369,9 @@
             '</div>';
     }
 
-    // --- Checkbox Toggle ---
+    // =====================================================================
+    // View mode: Checkbox toggle + wiki-link click
+    // =====================================================================
 
     document.addEventListener('change', (e) => {
         if (e.target.classList.contains('note-checkbox')) {
@@ -533,7 +1385,6 @@
                 body: JSON.stringify({ line, checked }),
             }).catch(err => console.error('Toggle failed:', err));
 
-            // Strikethrough visual feedback
             const li = e.target.closest('li');
             if (li) {
                 if (checked) {
@@ -547,7 +1398,6 @@
         }
     });
 
-    // Handle wiki-link clicks without page reload
     document.addEventListener('click', (e) => {
         const wikiLink = e.target.closest('.wiki-link[data-slug]');
         if (wikiLink) {
@@ -556,7 +1406,9 @@
         }
     });
 
-    // --- Wiki-Link Autocomplete ---
+    // =====================================================================
+    // Wiki-link title cache
+    // =====================================================================
 
     async function fetchTitles() {
         try {
@@ -567,171 +1419,9 @@
         }
     }
 
-    function handleAutocomplete(textarea) {
-        const val = textarea.value;
-        const cursor = textarea.selectionStart;
-        const before = val.substring(0, cursor);
-
-        // Check if we're inside [[ ... (no closing ]])
-        const match = before.match(/\[\[([^\[\]]*)$/);
-        if (match) {
-            const query = match[1].toLowerCase();
-            const filtered = noteTitles.filter(t =>
-                t.title.toLowerCase().includes(query) && t.slug !== currentSlug
-            ).slice(0, 8);
-
-            if (filtered.length > 0) {
-                showAutocomplete(textarea, filtered, cursor);
-                return;
-            }
-        }
-
-        hideAutocomplete();
-    }
-
-    function showAutocomplete(textarea, items, cursor) {
-        autocompleteIdx = 0;
-
-        autocompleteEl.innerHTML = '';
-        items.forEach((item, i) => {
-            const el = document.createElement('div');
-            el.className = 'link-autocomplete-item' + (i === 0 ? ' selected' : '');
-            el.textContent = item.title;
-            el.addEventListener('click', () => {
-                insertAutocompleteSelection(textarea, item.title);
-            });
-            autocompleteEl.appendChild(el);
-        });
-
-        // Position near the textarea (simplified: below toolbar area)
-        const rect = textarea.getBoundingClientRect();
-        autocompleteEl.style.left = (rect.left + 40) + 'px';
-        autocompleteEl.style.top = (rect.top + 30) + 'px';
-        autocompleteEl.classList.add('visible');
-    }
-
-    function hideAutocomplete() {
-        autocompleteEl.classList.remove('visible');
-        autocompleteIdx = -1;
-    }
-
-    function updateAutocompleteSelection(items) {
-        items.forEach((el, i) => {
-            el.classList.toggle('selected', i === autocompleteIdx);
-        });
-    }
-
-    function insertAutocompleteSelection(textarea, title) {
-        const val = textarea.value;
-        const cursor = textarea.selectionStart;
-        const before = val.substring(0, cursor);
-        const after = val.substring(cursor);
-
-        // Find the [[ and replace everything after it with the title]]
-        const openBracket = before.lastIndexOf('[[');
-        if (openBracket !== -1) {
-            textarea.value = before.substring(0, openBracket) + '[[' + title + ']]' + after;
-            const newPos = openBracket + title.length + 4; // [[ + title + ]]
-            textarea.setSelectionRange(newPos, newPos);
-        }
-
-        hideAutocomplete();
-        textarea.focus();
-        scheduleAutosave();
-    }
-
-    // --- Editor Helpers ---
-
-    function insertAtCursor(textarea, text) {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const val = textarea.value;
-
-        // If at start of line or empty, just insert
-        // Otherwise, add newline first
-        let prefix = '';
-        if (start > 0 && val[start - 1] !== '\n') {
-            prefix = '\n';
-        }
-
-        textarea.value = val.substring(0, start) + prefix + text + val.substring(end);
-        const newPos = start + prefix.length + text.length;
-        textarea.setSelectionRange(newPos, newPos);
-        textarea.focus();
-        scheduleAutosave();
-    }
-
-    function setLinePrefix(textarea, prefix) {
-        // Set or replace the prefix on the current line
-        const start = textarea.selectionStart;
-        const val = textarea.value;
-        const lineStart = val.lastIndexOf('\n', start - 1) + 1;
-        const lineEnd = val.indexOf('\n', start);
-        const lineEndPos = lineEnd === -1 ? val.length : lineEnd;
-        const line = val.substring(lineStart, lineEndPos);
-
-        // Remove any existing prefix
-        const stripped = line.replace(/^\[(section|subsection)\]\s*/i, '');
-        const newLine = prefix + stripped;
-        const diff = newLine.length - line.length;
-
-        textarea.value = val.substring(0, lineStart) + newLine + val.substring(lineEndPos);
-        textarea.setSelectionRange(start + diff, start + diff);
-        textarea.focus();
-        scheduleAutosave();
-    }
-
-    function removeLinePrefix(textarea) {
-        // Remove [section] or [subsection] prefix from the current line
-        const start = textarea.selectionStart;
-        const val = textarea.value;
-        const lineStart = val.lastIndexOf('\n', start - 1) + 1;
-        const lineEnd = val.indexOf('\n', start);
-        const lineEndPos = lineEnd === -1 ? val.length : lineEnd;
-        const line = val.substring(lineStart, lineEndPos);
-
-        const stripped = line.replace(/^\[(section|subsection)\]\s*/i, '');
-        const diff = stripped.length - line.length;
-
-        textarea.value = val.substring(0, lineStart) + stripped + val.substring(lineEndPos);
-        const newPos = Math.max(lineStart, start + diff);
-        textarea.setSelectionRange(newPos, newPos);
-        textarea.focus();
-        scheduleAutosave();
-    }
-
-    // --- Mobile Navigation ---
-
-    if (mobileBackBtn) {
-        mobileBackBtn.addEventListener('click', () => {
-            if (isEditing) {
-                saveCurrentNote();
-            }
-            sidebar.classList.remove('hidden');
-            currentSlug = null;
-            isEditing = false;
-            showEmptyState();
-            updateToolbar();
-            history.pushState({}, '', '/notes');
-        });
-    }
-
-    // Browser back/forward
-    window.addEventListener('popstate', (e) => {
-        if (e.state && e.state.slug) {
-            openNote(e.state.slug);
-        } else {
-            currentSlug = null;
-            isEditing = false;
-            showEmptyState();
-            updateToolbar();
-            if (window.innerWidth <= 768) {
-                sidebar.classList.remove('hidden');
-            }
-        }
-    });
-
-    // --- Utility ---
+    // =====================================================================
+    // Utility
+    // =====================================================================
 
     function escapeHtml(str) {
         const div = document.createElement('div');
@@ -755,25 +1445,55 @@
         }
     }
 
-    // --- Button Bindings ---
+    // =====================================================================
+    // Mobile Navigation
+    // =====================================================================
+
+    if (mobileBackBtn) {
+        mobileBackBtn.addEventListener('click', () => {
+            if (isEditing) {
+                saveCurrentNote();
+            }
+            sidebar.classList.remove('hidden');
+            currentSlug = null;
+            isEditing = false;
+            showEmptyState();
+            updateToolbar();
+            history.pushState({}, '', '/notes');
+        });
+    }
+
+    window.addEventListener('popstate', (e) => {
+        if (e.state && e.state.slug) {
+            openNote(e.state.slug);
+        } else {
+            currentSlug = null;
+            isEditing = false;
+            showEmptyState();
+            updateToolbar();
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('hidden');
+            }
+        }
+    });
+
+    // =====================================================================
+    // Button Bindings + Keyboard Shortcuts
+    // =====================================================================
 
     document.getElementById('new-note-btn').addEventListener('click', createNewNote);
     editBtn.addEventListener('click', toggleEdit);
     deleteBtn.addEventListener('click', deleteCurrentNote);
 
-    // --- Keyboard shortcut ---
     document.addEventListener('keydown', (e) => {
-        // Cmd/Ctrl+N: new note
         if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
             e.preventDefault();
             createNewNote();
         }
-        // Cmd/Ctrl+E: toggle edit
         if ((e.metaKey || e.ctrlKey) && e.key === 'e') {
             e.preventDefault();
             if (currentSlug) toggleEdit();
         }
-        // Escape: exit edit or close autocomplete
         if (e.key === 'Escape') {
             if (autocompleteEl.classList.contains('visible')) {
                 hideAutocomplete();
@@ -783,13 +1503,14 @@
         }
     });
 
-    // --- Init ---
+    // =====================================================================
+    // Init
+    // =====================================================================
 
     async function init() {
         await loadNotes(1, '', false);
         await fetchTitles();
 
-        // If there's an initial slug (from URL), open it
         const initialSlug = document.body.dataset.initialSlug;
         if (initialSlug) {
             openNote(initialSlug);
