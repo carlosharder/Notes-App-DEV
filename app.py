@@ -219,6 +219,15 @@ def remove_index_entry(slug):
 def render_note(text, slug=None):
     title_map = {m['title'].lower(): m['slug'] for m in _notes_cache.values()}
 
+    def resolve_hyperlinks(line_html):
+        """Convert [text](url) to <a> tags with target=_blank, operating on already-escaped HTML."""
+        def replace_hyperlink(match):
+            text = match.group(1)
+            url = match.group(2)
+            # text and url are already HTML-escaped from the line_html
+            return f'<a href="{url}" class="hyperlink" target="_blank" rel="noopener noreferrer">{text}</a>'
+        return re.sub(r'\[(.+?)\]\((https?://[^\s)]+)\)', replace_hyperlink, line_html)
+
     def resolve_wiki_links(line_html):
         def replace_link(match):
             title = match.group(1)
@@ -228,45 +237,98 @@ def render_note(text, slug=None):
             return f'<span class="wiki-link broken">{html_escape(title)}</span>'
         return re.sub(r'\[\[(.+?)\]\]', replace_link, line_html)
 
+    def resolve_inline_formatting(line_html):
+        """Convert **bold**, *italic*, __underline__, ~~strike~~ to HTML tags."""
+        line_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', line_html)
+        line_html = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', line_html)
+        line_html = re.sub(r'__(.+?)__', r'<u>\1</u>', line_html)
+        line_html = re.sub(r'~~(.+?)~~', r'<s>\1</s>', line_html)
+        return line_html
+
+    def resolve_inline(line_html):
+        """Apply all inline transformations: hyperlinks, wiki links, then formatting."""
+        line_html = resolve_hyperlinks(line_html)
+        line_html = resolve_wiki_links(line_html)
+        line_html = resolve_inline_formatting(line_html)
+        return line_html
+
     lines = text.split('\n')
     html_parts = []
     in_checklist = False
+    in_bullet = False
+    in_dash = False
+    in_num = False
+
+    def close_all_lists():
+        nonlocal in_checklist, in_bullet, in_dash, in_num
+        if in_checklist:
+            html_parts.append('</ul>')
+            in_checklist = False
+        if in_bullet:
+            html_parts.append('</ul>')
+            in_bullet = False
+        if in_dash:
+            html_parts.append('</ul>')
+            in_dash = False
+        if in_num:
+            html_parts.append('</ol>')
+            in_num = False
 
     for i, line in enumerate(lines):
-        stripped = line.strip()
+        indent_match = re.match(r'^(\t*)(.*)', line)
+        indent_level = len(indent_match.group(1)) if indent_match else 0
+        stripped = (indent_match.group(2) if indent_match else line).strip()
+        indent_style = f' style="margin-left:{indent_level * 28}px"' if indent_level > 0 else ''
 
         # Section heading
         section_match = re.match(r'^\[section\]\s*(.*)', stripped, re.IGNORECASE)
         if section_match:
-            if in_checklist:
-                html_parts.append('</ul>')
-                in_checklist = False
+            close_all_lists()
             content = str(html_escape(section_match.group(1)))
-            content = resolve_wiki_links(content)
-            html_parts.append(f'<div class="note-section">{content}</div>')
+            content = resolve_inline(content)
+            html_parts.append(f'<div class="note-section"{indent_style}>{content}</div>')
             continue
 
         # Sub-section heading
         subsection_match = re.match(r'^\[subsection\]\s*(.*)', stripped, re.IGNORECASE)
         if subsection_match:
-            if in_checklist:
-                html_parts.append('</ul>')
-                in_checklist = False
+            close_all_lists()
             content = str(html_escape(subsection_match.group(1)))
-            content = resolve_wiki_links(content)
-            html_parts.append(f'<div class="note-subsection">{content}</div>')
+            content = resolve_inline(content)
+            html_parts.append(f'<div class="note-subsection"{indent_style}>{content}</div>')
+            continue
+
+        # Monospaced block
+        mono_match = re.match(r'^\[mono\]\s*(.*)', stripped, re.IGNORECASE)
+        if mono_match:
+            close_all_lists()
+            content = str(html_escape(mono_match.group(1)))
+            content = resolve_inline(content)
+            html_parts.append(f'<div class="note-mono"{indent_style}>{content}</div>')
+            continue
+
+        # Block Quote
+        quote_match = re.match(r'^\[quote\]\s*(.*)', stripped, re.IGNORECASE)
+        if quote_match:
+            close_all_lists()
+            content = str(html_escape(quote_match.group(1)))
+            content = resolve_inline(content)
+            html_parts.append(f'<div class="note-quote"{indent_style}>{content}</div>')
             continue
 
         # Checklist item (unchecked)
         check_match = re.match(r'^[-*]\s*\[ \]\s*(.*)', stripped)
         if check_match:
+            if in_bullet: html_parts.append('</ul>'); in_bullet = False
+            if in_dash: html_parts.append('</ul>'); in_dash = False
+            if in_num: html_parts.append('</ol>'); in_num = False
             if not in_checklist:
                 html_parts.append('<ul class="note-checklist">')
                 in_checklist = True
             content = str(html_escape(check_match.group(1)))
-            content = resolve_wiki_links(content)
+            content = resolve_inline(content)
             html_parts.append(
-                f'<li><input type="checkbox" class="note-checkbox" data-slug="{slug}" data-line="{i}">'
+                f'<li{indent_style}><input type="checkbox" class="note-checkbox" data-slug="{slug}" data-line="{i}">'
                 f' {content}</li>'
             )
             continue
@@ -274,23 +336,98 @@ def render_note(text, slug=None):
         # Checklist item (checked)
         checkx_match = re.match(r'^[-*]\s*\[x\]\s*(.*)', stripped, re.IGNORECASE)
         if checkx_match:
+            if in_bullet: html_parts.append('</ul>'); in_bullet = False
+            if in_dash: html_parts.append('</ul>'); in_dash = False
+            if in_num: html_parts.append('</ol>'); in_num = False
             if not in_checklist:
                 html_parts.append('<ul class="note-checklist">')
                 in_checklist = True
             content = str(html_escape(checkx_match.group(1)))
-            content = resolve_wiki_links(content)
+            content = resolve_inline(content)
             html_parts.append(
-                f'<li class="checked"><input type="checkbox" class="note-checkbox" data-slug="{slug}" data-line="{i}" checked>'
+                f'<li class="checked"{indent_style}><input type="checkbox" class="note-checkbox" data-slug="{slug}" data-line="{i}" checked>'
                 f' {content}</li>'
+            )
+            continue
+
+        # Bullet list item
+        bullet_match = re.match(r'^\[bullet\]\s*(.*)', stripped, re.IGNORECASE)
+        if bullet_match:
+            if in_checklist:
+                html_parts.append('</ul>')
+                in_checklist = False
+            if in_dash:
+                html_parts.append('</ul>')
+                in_dash = False
+            if in_num:
+                html_parts.append('</ol>')
+                in_num = False
+            if not in_bullet:
+                html_parts.append('<ul class="note-bullet-list">')
+                in_bullet = True
+            content = str(html_escape(bullet_match.group(1)))
+            content = resolve_inline(content)
+            html_parts.append(f'<li{indent_style}>{content}</li>')
+            continue
+
+        # Dashed list item
+        dash_match = re.match(r'^\[dash\]\s*(.*)', stripped, re.IGNORECASE)
+        if dash_match:
+            if in_checklist:
+                html_parts.append('</ul>')
+                in_checklist = False
+            if in_bullet:
+                html_parts.append('</ul>')
+                in_bullet = False
+            if in_num:
+                html_parts.append('</ol>')
+                in_num = False
+            if not in_dash:
+                html_parts.append('<ul class="note-dash-list">')
+                in_dash = True
+            content = str(html_escape(dash_match.group(1)))
+            content = resolve_inline(content)
+            html_parts.append(f'<li{indent_style}>{content}</li>')
+            continue
+
+        # Numbered list item
+        num_match = re.match(r'^\[num\]\s*(.*)', stripped, re.IGNORECASE)
+        if num_match:
+            if in_checklist:
+                html_parts.append('</ul>')
+                in_checklist = False
+            if in_bullet:
+                html_parts.append('</ul>')
+                in_bullet = False
+            if in_dash:
+                html_parts.append('</ul>')
+                in_dash = False
+            if not in_num:
+                html_parts.append('<ol class="note-num-list">')
+                in_num = True
+            content = str(html_escape(num_match.group(1)))
+            content = resolve_inline(content)
+            html_parts.append(f'<li{indent_style}>{content}</li>')
+            continue
+
+        # Image embed: ![alt](images/filename.ext)
+        img_match = re.match(r'^!\[([^\]]*)\]\((images/[^)]+)\)$', stripped)
+        if img_match:
+            close_all_lists()
+            alt_text = str(html_escape(img_match.group(1)))
+            img_filename = os.path.basename(img_match.group(2))
+            safe_img = str(html_escape(img_filename))
+            html_parts.append(
+                f'<div class="note-image">'
+                f'<img src="/api/images/{safe_img}" alt="{alt_text}" loading="lazy">'
+                f'</div>'
             )
             continue
 
         # Audio embed
         audio_match = re.match(r'^\[audio:(.+?)\]$', stripped, re.IGNORECASE)
         if audio_match:
-            if in_checklist:
-                html_parts.append('</ul>')
-                in_checklist = False
+            close_all_lists()
             filename = audio_match.group(1).strip()
             safe_name = str(html_escape(filename))
             html_parts.append(
@@ -303,23 +440,20 @@ def render_note(text, slug=None):
             )
             continue
 
-        # Close checklist if we left it
-        if in_checklist:
-            html_parts.append('</ul>')
-            in_checklist = False
+        # Close any open list containers
+        close_all_lists()
 
         # Empty line -> paragraph break
         if not stripped:
-            html_parts.append('<div class="note-blank"></div>')
+            html_parts.append(f'<div class="note-blank"{indent_style}></div>')
             continue
 
         # Regular text line
-        content = str(html_escape(line))
-        content = resolve_wiki_links(content)
-        html_parts.append(f'<div class="note-line">{content}</div>')
+        content = str(html_escape(stripped))
+        content = resolve_inline(content)
+        html_parts.append(f'<div class="note-line"{indent_style}>{content}</div>')
 
-    if in_checklist:
-        html_parts.append('</ul>')
+    close_all_lists()
 
     return '\n'.join(html_parts)
 
@@ -618,6 +752,30 @@ def api_audio_list(slug):
                     'size': os.path.getsize(fpath),
                 })
     return jsonify(files)
+
+
+# --- Image API ---
+
+ALLOWED_IMAGE_EXT = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
+
+
+@app.route('/api/images/<filename>')
+@login_required
+def api_image_serve(filename):
+    """Serve an image file from the shared images directory."""
+    images_dir = os.path.join(NOTES_DIR, 'images')
+    safe_name = secure_filename(filename)
+    if not safe_name:
+        return jsonify({'error': 'Invalid filename'}), 400
+    ext = os.path.splitext(safe_name)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXT:
+        return jsonify({'error': 'Invalid image type'}), 400
+    fpath = os.path.join(images_dir, safe_name)
+    if not os.path.isfile(fpath):
+        return jsonify({'error': 'Image not found'}), 404
+    mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif', '.webp': 'image/webp'}
+    return send_from_directory(images_dir, safe_name, mimetype=mime_map.get(ext, 'image/png'))
 
 
 # --- Startup ---

@@ -370,6 +370,20 @@ html, body {
     border-radius: 50%;
 }
 
+/* --- Note Images --- */
+
+.note-image {
+    margin: 8px 0;
+    text-align: center;
+}
+
+.note-image img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
 /* --- Audio Player --- */
 
 .note-audio {
@@ -521,6 +535,141 @@ html, body {
     -webkit-user-select: all;
 }
 
+/* Hyperlink in editor */
+.hyperlink-edit {
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: rgba(0,122,255,0.4);
+    text-underline-offset: 2px;
+    cursor: pointer;
+    padding: 0 1px;
+    border-radius: 2px;
+    user-select: all;
+    -webkit-user-select: all;
+}
+
+.hyperlink-edit::after {
+    content: '↗';
+    font-size: 0.75em;
+    margin-left: 1px;
+    opacity: 0.5;
+}
+
+/* Hyperlink in view mode */
+.hyperlink {
+    color: var(--link);
+    text-decoration: underline;
+    text-decoration-color: rgba(0,122,255,0.4);
+    text-underline-offset: 2px;
+    transition: text-decoration-color 0.2s;
+}
+
+.hyperlink:hover {
+    text-decoration-color: var(--link);
+}
+
+.hyperlink::after {
+    content: '↗';
+    font-size: 0.75em;
+    margin-left: 1px;
+    opacity: 0.5;
+}
+
+/* Monospaced / Code block */
+.note-mono {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 1.5;
+    background: rgba(0,0,0,0.04);
+    border-radius: 6px;
+    padding: 4px 8px;
+    margin: 2px 0;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+}
+
+/* Block Quote */
+.note-quote {
+    border-left: 3px solid var(--border);
+    padding-left: 14px;
+    margin: 4px 0;
+    color: var(--text-secondary);
+    line-height: 1.65;
+}
+
+/* List items in editor (bullet/dash/num) */
+.note-bullet-item,
+.note-dash-item,
+.note-num-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 2px 0;
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+.list-marker {
+    min-width: 22px;
+    text-align: center;
+    color: var(--text-secondary);
+    user-select: none;
+    -webkit-user-select: none;
+    flex-shrink: 0;
+    font-size: 16px;
+    line-height: 1.65;
+}
+
+.list-text {
+    flex: 1;
+    outline: none;
+    min-width: 0;
+}
+
+/* List styles in view mode */
+.note-bullet-list {
+    list-style: disc;
+    padding-left: 24px;
+    margin: 4px 0;
+}
+
+.note-bullet-list li {
+    font-size: 16px;
+    line-height: 1.65;
+    padding: 1px 0;
+}
+
+.note-dash-list {
+    list-style: none;
+    padding-left: 24px;
+    margin: 4px 0;
+}
+
+.note-dash-list li {
+    position: relative;
+    font-size: 16px;
+    line-height: 1.65;
+    padding: 1px 0;
+}
+
+.note-dash-list li::before {
+    content: '\2013';
+    position: absolute;
+    margin-left: -20px;
+    color: var(--text-secondary);
+}
+
+.note-num-list {
+    list-style: decimal;
+    padding-left: 28px;
+    margin: 4px 0;
+}
+
+.note-num-list li {
+    font-size: 16px;
+    line-height: 1.65;
+    padding: 1px 0;
+}
+
 /* Audio block in editor */
 .note-audio-block {
     background: var(--bg-sidebar);
@@ -549,11 +698,19 @@ html, body {
 /* Editor toolbar */
 .editor-toolbar {
     display: flex;
+    flex-direction: column;
     gap: 2px;
     padding: 4px;
     background: var(--bg-sidebar);
     border-radius: var(--radius);
     margin-bottom: 16px;
+}
+
+.toolbar-row {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .editor-toolbar button {
@@ -575,6 +732,17 @@ html, body {
     background: rgba(0,0,0,0.08);
     color: var(--text-primary);
 }
+
+.editor-toolbar button.active {
+    background: rgba(0,0,0,0.12);
+    color: var(--text-primary);
+}
+
+/* Inline format button styling */
+#toolbar-bold { font-weight: 700; min-width: 32px; justify-content: center; }
+#toolbar-italic { font-style: italic; min-width: 32px; justify-content: center; }
+#toolbar-underline { text-decoration: underline; min-width: 32px; justify-content: center; }
+#toolbar-strike { text-decoration: line-through; min-width: 32px; justify-content: center; }
 
 .toolbar-divider {
     width: 1px;
@@ -881,6 +1049,35 @@ html, body {
     cursor: pointer;
 }
 
+/* Hyperlink modal fields */
+.hyperlink-field {
+    margin-bottom: 12px;
+}
+
+.hyperlink-field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.hyperlink-field input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.hyperlink-field input:focus {
+    border-color: var(--accent);
+}
+
 /* --- Responsive / Mobile --- */
 
 @media (max-width: 768px) {
@@ -941,11 +1138,22 @@ html, body {
         height: 40px;
     }
 
-    .editor-toolbar {
-        flex-wrap: wrap;
+    .editor-toolbar button {
+        padding: 5px 8px;
+        font-size: 12px;
     }
 
     .note-body-editable {
+        font-size: 15px;
+    }
+
+    .note-mono {
+        font-size: 13px;
+    }
+
+    .note-bullet-item,
+    .note-dash-item,
+    .note-num-item {
         font-size: 15px;
     }
 
