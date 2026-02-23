@@ -1,0 +1,7 @@
+---
+title: Oliver Pereira
+created: 2024-03-18T15:04:37
+modified: 2024-06-09T05:55:41
+---
+
+![D27AEFC0-AC66-4F74-82A4-9A148E84F0E6](images/D27AEFC0-AC66-4F74-82A4-9A148E84F0E6.heic)

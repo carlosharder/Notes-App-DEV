@@ -3,4 +3,7 @@ __pycache__/
 .env
 .DS_Store
 .claude/
-notes/
+# Notes: track .md files, exclude binary assets and index
+notes/images/
+notes/media/
+notes/.notes_index.json

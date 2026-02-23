@@ -1,0 +1,30 @@
+---
+title: ---
+created: 2024-08-24T06:51:29
+modified: 2024-08-24T06:56:55
+---
+
+---
+title: Red Yeast Rice
+creation_date: August 24, 2024
+modification_date: August 24, 2024
+---
+
+
+
+Tube alergias a principio de Julio. 
+Lo trate de tomar individualmente agosto 22 del 2024
+Tuve de nuevo alergias. 
+
+
+
+
+
+![548D8D2C-FA73-4DD1-BA1B-089F35EE7A5B](images/548D8D2C-FA73-4DD1-BA1B-089F35EE7A5B.png)
+![6ECB4FBE-294E-40AF-86AC-C1AB7BEA9AE5](images/6ECB4FBE-294E-40AF-86AC-C1AB7BEA9AE5.png)
+![F8128000-2054-4EF6-9030-C2EE183AE7C2](images/F8128000-2054-4EF6-9030-C2EE183AE7C2.png)
+![770C1355-B5FB-4F0F-8E56-F4A807828064](images/770C1355-B5FB-4F0F-8E56-F4A807828064.png)
+
+
+
+[78ADA78C-CC8A-4E0D-B786-5342FA672539](attachments/78ADA78C-CC8A-4E0D-B786-5342FA672539.pdf)

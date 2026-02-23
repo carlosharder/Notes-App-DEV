@@ -1,0 +1,7 @@
+---
+title: Friend: Linda Blanco
+created: 2024-03-18T15:05:32
+modified: 2024-08-18T14:28:15
+---
+
+![238A4E80-6FCB-4179-B8BF-704349BA3C27](images/238A4E80-6FCB-4179-B8BF-704349BA3C27.png)

@@ -1,0 +1,21 @@
+---
+title: ---
+created: 2024-08-20T10:35:23
+modified: 2024-08-20T10:46:57
+---
+
+---
+title: Hotel Presidente
+creation_date: August 20, 2024
+modification_date: August 20, 2024
+---
+
+
+
+[[< Mexico]]
+
+
+![40B41C54-757F-4DB4-9057-EC2BA8C66FFA](images/40B41C54-757F-4DB4-9057-EC2BA8C66FFA.png)
+![F8D13A07-8CB5-406C-B1F5-5F6276B27AD7](images/F8D13A07-8CB5-406C-B1F5-5F6276B27AD7.png)
+
+![84BBA11F-4DBA-43CE-8D77-A09964BA3390](images/84BBA11F-4DBA-43CE-8D77-A09964BA3390.png)

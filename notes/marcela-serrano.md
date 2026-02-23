@@ -1,0 +1,10 @@
+---
+title: Marcela Serrano
+created: 2024-03-29T13:58:17
+modified: 2024-03-29T13:59:03
+---
+
+La Novela
+
+
+![DBAF8DAA-5944-460A-ABA7-4A1474D7ABE1](images/DBAF8DAA-5944-460A-ABA7-4A1474D7ABE1.jpeg)

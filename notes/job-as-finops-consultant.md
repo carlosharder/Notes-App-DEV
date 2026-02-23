@@ -1,0 +1,7 @@
+---
+title: Job as FinOps consultant
+created: 2024-03-17T08:19:30
+modified: 2024-08-09T07:16:30
+---
+
+[F6E52568-5C81-4785-BA46-8C82845B9E47](attachments/F6E52568-5C81-4785-BA46-8C82845B9E47.MOV)

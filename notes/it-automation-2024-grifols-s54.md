@@ -1,0 +1,51 @@
+---
+title: IT Automation 2024 | Grifols s54
+created: 2024-03-17T16:39:56
+modified: 2024-03-17T16:39:57
+---
+
+[FinOps@](https://ibmsc.lightning.force.com/lightning/r/Opportunity/0063h00000MDUXXAA5/view) [NAV](https://www.linkedin.com/sales/search/people?query=(spellCorrectionEnabled%3Atrue%2CrecentSearchParam%3A(id%3A3526553964%2CdoLogHistory%3Atrue)%2Cfilters%3AList((type%3ACURRENT_COMPANY%2Cvalues%3AList((id%3Aurn%253Ali%253Aorganization%253A16940%2Ctext%3AGrifols%2CselectionType%3AINCLUDED))))%2Ckeywords%3ACloud)&sessionId=GWkzBoWXTHylh87g3x9IiA%3D%3D). [GrifolsEspaña](https://ibmsc.lightning.force.com/lightning/r/Account/0013h000016q9wkAAA/related/Opportunities/view). [GrifolsUSA](https://ibmsc.lightning.force.com/lightning/r/Account/0013h00000w2VNFAA2/related/Opportunities/view)
+
+* Ask Jacob Bryant for contact at the purchasing level.
+* Looks like the companies buy more via US.
+* Where is their infrastructure?
+* Tuch base in 1st week of Q2
+* This is also a CDW account
+
+
+
+
+
+**GRIFOLS**
+
+![61D5B98B-E1B7-46B8-83F9-CF639BB1E7D6](images/61D5B98B-E1B7-46B8-83F9-CF639BB1E7D6.png)
+![154D34BD-21FA-40D4-B150-E12E08FE027A](images/154D34BD-21FA-40D4-B150-E12E08FE027A.png)
+
+![02F864D0-2B79-459A-9FFD-F81B29D1E0F2](images/02F864D0-2B79-459A-9FFD-F81B29D1E0F2.png)
+![F6A8543C-6D2B-428B-8FF1-DEED53B3A589](images/F6A8543C-6D2B-428B-8FF1-DEED53B3A589.png)
+
+
+|                                                            | Contacts                                                   |                                                            |                                                            |                                                            |                                                            |
+|------------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------|
+| Andres Prieto Anton                                        | Grifols                                                    | System Administrator                                       | andres.prieto@grifols.com                                  | 3.47E+10                                                   | Show Actions                                               |
+| Andres Prieto Anton                                        | Grifols                                                    | System Administrator                                       | andres.prieto-anton@grifols.com                            | +34 935 71 22 00                                           | Show Actions                                               |
+| Joan Dalmau Gamarra                                        | Grifols                                                    | Global Data Centre Manager                                 | joan.dalmau@grifols.com                                    | +34 935 71 04 10                                           |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |
+|                                                            |                                                            | LEADS                                                      |                                                            |                                                            |                                                            |
+| Clayton Buckage                                            | Engineering: Data Center / IT                              | grifols                                                    | clay.buckage@grifols.com                                   | 510-923-4319                                               | 5/5/22 6:45                                                |
+| Daniel Cordoba                                             | IT Infrastructure and Cloud Operations                     | GRIFOLS SA                                                 | daniel.cordoba@grifols.com                                 | 34 935710500                                               | 4/8/22 4:14                                                |
+| Fran Martin                                                |                                                            | Grifols                                                    | francisco.martin@external.grifols.com                      |                                                            | #########                                                  |
+| Gaspar Cardenas                                            | Network Engineering IT Manager                             | Grifols                                                    | gaspar.alarcon@grifols.com                                 | 3.49E+10                                                   | #########                                                  |
+| Ivan Rodriguez Artigas                                     | IT Infrastructure and Cloud Operations                     | Grifols                                                    | irodriguez@grifols.com                                     | +34 935 71 22 46                                           | 6/1/22 6:33                                                |
+| Jorge Herranz                                              | IT Infrastructure Manager                                  | Grifols                                                    | jorge.herranz@grifols.com                                  | +34 935 71 04 10                                           | #########                                                  |
+| Lluis Robert                                               | Director, Corporate Information Technology, Infrastructure | Grifols                                                    | lluis.florido@grifols.com                                  | (561) 569-3110                                             | #########                                                  |
+|                                                            |                                                            |                                                            |                                                            |                                                            |                                                            |

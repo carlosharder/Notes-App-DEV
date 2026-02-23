@@ -1,0 +1,7 @@
+---
+title: Tio Goyo
+created: 2024-03-16T17:18:14
+modified: 2024-08-18T16:31:24
+---
+
+[95C49C58-1EFA-440B-9C4B-7FC6C0F308A7](attachments/95C49C58-1EFA-440B-9C4B-7FC6C0F308A7.mov)

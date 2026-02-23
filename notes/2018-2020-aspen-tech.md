@@ -1,0 +1,18 @@
+---
+title: 2018 - 2020 Aspen Tech
+created: 2024-03-16T15:56:37
+modified: 2025-09-16T12:00:45
+---
+
+# 2018 - 2020 Aspen Tech
+[[Cronología]]
+
+￼
+[[Fired from Aspen]]
+[[N 16430 Exit Aspen]]
+[[AspenTech Recordings]]
+
+
+[D09FD390-FA3A-4B65-B813-EA4FC842B938](attachments/D09FD390-FA3A-4B65-B813-EA4FC842B938.xlsx)
+[CF68807C-919E-407C-8AB0-FBBCBEF42E60](attachments/CF68807C-919E-407C-8AB0-FBBCBEF42E60.xlsx)
+[B3E48B94-7898-46CF-A1BA-7469CFF9A443](attachments/B3E48B94-7898-46CF-A1BA-7469CFF9A443.pdf)

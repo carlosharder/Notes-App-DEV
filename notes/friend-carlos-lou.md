@@ -1,0 +1,7 @@
+---
+title: Friend: Carlos Lou
+created: 2024-03-18T03:29:10
+modified: 2025-06-26T14:49:23
+---
+
+![3BFA40C0-B1B4-4E03-AB44-2ACDAE433987](images/3BFA40C0-B1B4-4E03-AB44-2ACDAE433987.jpeg)

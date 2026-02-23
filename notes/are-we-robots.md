@@ -1,0 +1,8 @@
+---
+title: Are we robots
+created: 2024-03-17T08:30:28
+modified: 2024-03-28T22:51:06
+---
+
+Are we
+![5BE89C15-8230-4D05-93AF-63C966016614](images/5BE89C15-8230-4D05-93AF-63C966016614.PNG)

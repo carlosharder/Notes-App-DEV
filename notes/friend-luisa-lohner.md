@@ -1,0 +1,7 @@
+---
+title: Friend: Luisa Lohner
+created: 2024-03-18T15:10:24
+modified: 2024-03-18T16:01:20
+---
+
+![B56CD775-AAC5-4A68-9B17-23A87187FA49](images/B56CD775-AAC5-4A68-9B17-23A87187FA49.jpg)

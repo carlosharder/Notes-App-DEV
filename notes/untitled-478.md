@@ -1,0 +1,16 @@
+---
+title: ---
+created: 2024-08-18T14:58:42
+modified: 2024-08-18T14:59:03
+---
+
+---
+title: Outline 2023
+creation_date: August 18, 2024
+modification_date: August 18, 2024
+---
+
+
+
+![DF239970-A0DB-46DD-AD88-E6EF08A96EC2](images/DF239970-A0DB-46DD-AD88-E6EF08A96EC2.png)
+![4BB8B529-7DC4-4271-A1C3-4D9820ADDD92](images/4BB8B529-7DC4-4271-A1C3-4D9820ADDD92.png)

@@ -1,0 +1,7 @@
+---
+title: Kinds of close friends
+created: 2024-03-19T06:23:27
+modified: 2024-03-19T06:23:27
+---
+
+![9906722C-80B3-476A-99C6-643682A194B3](images/9906722C-80B3-476A-99C6-643682A194B3.JPG)

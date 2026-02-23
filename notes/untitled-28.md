@@ -1,0 +1,45 @@
+---
+title: ---
+created: 2024-07-19T16:36:33
+modified: 2024-12-28T10:10:20
+---
+
+---
+title: 1 Password
+creation_date: July 19, 2024
+modification_date: December 28, 2024
+---
+
+
+
+#security
+￼
+
+
+Code for 2-step code verification
+From google
+Specific to dropbox
+
+
+
+![2B7D4759-071D-4ABC-8051-E0009DBEB1AF](images/2B7D4759-071D-4ABC-8051-E0009DBEB1AF.png)
+
+
+
+![51ADB40A-7C53-474E-BD26-0FDBB720E5A5](images/51ADB40A-7C53-474E-BD26-0FDBB720E5A5.png)
+
+
+
+
+
+Juanadearco@1503
+
+
+A3-WZKHDQ-CW3F9X-4JPKL-LHGRS-P9DD4-RW9XB
+
+
+[CA9186B7-9EA4-4698-AA74-0E7DCE7DCB7B](attachments/CA9186B7-9EA4-4698-AA74-0E7DCE7DCB7B.pdf)
+![BFBB8EAB-4729-4A23-9524-1D7B711DD851](images/BFBB8EAB-4729-4A23-9524-1D7B711DD851.png)
+
+
+![50A240D5-397D-490B-BEEF-EA47289BC380](images/50A240D5-397D-490B-BEEF-EA47289BC380.png)

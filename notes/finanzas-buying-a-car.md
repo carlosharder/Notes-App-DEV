@@ -1,0 +1,42 @@
+---
+title: Finanzas | Buying a car
+created: 2024-03-18T02:47:45
+modified: 2024-08-08T21:42:59
+---
+
+Aug 8 2024.
+Got approve for 11% interest. While having an 815 fico. 
+
+
+
+![90C09BAB-4AC8-48E6-A19D-616DF5A42AB7](images/90C09BAB-4AC8-48E6-A19D-616DF5A42AB7.png)
+
+
+
+
+
+
+
+
+
+![1E4DC5B6-545F-4A14-83BF-750D77CEECF0](images/1E4DC5B6-545F-4A14-83BF-750D77CEECF0.png)
+
+
+
+
+
+[6E59EBAF-8D55-4A58-AD22-2A286B1E2477](attachments/6E59EBAF-8D55-4A58-AD22-2A286B1E2477.pdf)
+
+
+
+
+
+
+
+
+
+
+
+
+
+[5D77072A-74EA-4744-AD2F-1AC9957E6449](attachments/5D77072A-74EA-4744-AD2F-1AC9957E6449.pdf)

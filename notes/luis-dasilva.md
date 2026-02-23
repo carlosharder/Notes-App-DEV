@@ -1,0 +1,8 @@
+---
+title: Luis Dasilva
+created: 2024-03-17T08:31:20
+modified: 2025-01-16T08:54:34
+---
+
+[[SHR-amigos]]
+![3DEA972C-5C6D-4587-B5FD-388682F1DD46](images/3DEA972C-5C6D-4587-B5FD-388682F1DD46.PNG)

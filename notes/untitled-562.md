@@ -1,0 +1,30 @@
+---
+title: ---
+created: 2024-08-25T17:57:17
+modified: 2025-09-19T06:31:40
+---
+
+---
+title: Time Tracking
+creation_date: August 25, 2024
+modification_date: September 19, 2025
+---
+
+[[<Evolución ⛵]]
+
+
+
+
+
+
+![1A38D248-E160-425C-8FFF-D5B8B61FDA53](images/1A38D248-E160-425C-8FFF-D5B8B61FDA53.jpg)
+
+
+
+
+
+https://www.ebay.com/itm/315524318042?itmmeta=01J65W25M5FB4B0SFA02XCQ845&hash=item4976b7035a:g:PQMAAOSw-g1mieNR&amdata=enc%3AAQAJAAAA4Mxmj%2BiGvOveHXEBClPb29jB0jw7n9mCRW0TAEqyYfIj99ecbaHAjcPqbXMbrtuNZFI5Xte36NhzrDVtTx4HTiua8fUaTfjbAb5VFM--Be0%2FcCo%2FSF9d%2BUak5EgNlM%2FWhStz8L5RblXRKdjmMgtzZp5mAWxvwqUnC4lTKyOO5JL1Hdf13e5%2F0Fk%2Bfe307taVMZtyH7ulM841jFzLF8L6dGbZTpfgJg5pB0WOJKiMs6JnOWvejFNaVBLGCiJqiBiYAKdm%2BiFCDcvAhPNdPNUMQZ0Spjm5TQaO%2BbrPWx05rXlp%7Ctkp%3ABk9SR5baiLyxZA
+## **[Vintage Simplex Time Clock Punch Card Recorder | eBay](https://www.ebay.com/itm/315524318042?itmmeta=01J65W25M5FB4B0SFA02XCQ845&hash=item4976b7035a:g:PQMAAOSw-g1mieNR&amdata=enc%3AAQAJAAAA4Mxmj%2BiGvOveHXEBClPb29jB0jw7n9mCRW0TAEqyYfIj99ecbaHAjcPqbXMbrtuNZFI5Xte36NhzrDVtTx4HTiua8fUaTfjbAb5VFM--Be0%2FcCo%2FSF9d%2BUak5EgNlM%2FWhStz8L5RblXRKdjmMgtzZp5mAWxvwqUnC4lTKyOO5JL1Hdf13e5%2F0Fk%2Bfe307taVMZtyH7ulM841jFzLF8L6dGbZTpfgJg5pB0WOJKiMs6JnOWvejFNaVBLGCiJqiBiYAKdm%2BiFCDcvAhPNdPNUMQZ0Spjm5TQaO%2BbrPWx05rXlp%7Ctkp%3ABk9SR5baiLyxZA)**
+
+
+![22A7389C-74DD-4BE8-99ED-F8C35F0936FE](images/22A7389C-74DD-4BE8-99ED-F8C35F0936FE.png)

@@ -1,0 +1,13 @@
+---
+title: The Challenger Sale
+created: 2024-04-06T10:00:26
+modified: 2024-04-06T10:01:16
+---
+
+￼
+
+
+
+
+
+![6C930977-BD0C-462E-9043-3199254F977C](images/6C930977-BD0C-462E-9043-3199254F977C.jpeg)

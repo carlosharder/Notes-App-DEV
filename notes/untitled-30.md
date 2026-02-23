@@ -1,0 +1,21 @@
+---
+title: ---
+created: 2024-03-23T18:14:24
+modified: 2025-10-31T05:15:17
+---
+
+---
+title: 1975
+creation_date: March 23, 2024
+modification_date: October 31, 2025
+---
+
+
+Born in Mexico
+
+
+![73C0026A-80BC-4B23-87D9-572187771FC5](images/73C0026A-80BC-4B23-87D9-572187771FC5.jpeg)
+
+
+![98EEBFB9-039C-49EE-9C69-817BF2A3F5E8](images/98EEBFB9-039C-49EE-9C69-817BF2A3F5E8.jpeg)
+![CB6ECE16-9336-46DB-8C62-AFBEB1086CA8](images/CB6ECE16-9336-46DB-8C62-AFBEB1086CA8.jpeg)

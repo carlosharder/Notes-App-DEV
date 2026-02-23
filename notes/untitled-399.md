@@ -1,0 +1,44 @@
+---
+title: ---
+created: 2024-08-08T20:14:19
+modified: 2025-09-17T17:59:08
+---
+
+---
+title: Max Videos
+creation_date: August 8, 2024
+modification_date: September 17, 2025
+---
+
+# [[🐈‍⬛ Max]]
+# - Videos
+[[[] EMI]]
+
+
+
+
+
+[F7B116A1-5F13-4E67-B33E-D17039DD2E42](attachments/F7B116A1-5F13-4E67-B33E-D17039DD2E42.mp4)
+
+
+
+![25D908A4-EB6E-48A3-8D9B-67DF83316343](images/25D908A4-EB6E-48A3-8D9B-67DF83316343.jpg)
+
+
+
+![8AAEA5FA-3A57-448D-8777-88549B87F570](images/8AAEA5FA-3A57-448D-8777-88549B87F570.jpg)
+
+
+
+￼
+
+[[Max - Financial Plan]]
+
+
+￼
+
+[[El tiempo es un regalo]]
+![A73A92AF-9838-4DFE-9299-A0FCEA7AEDCC](images/A73A92AF-9838-4DFE-9299-A0FCEA7AEDCC.JPG)
+
+
+[A28F7548-DBFD-42F9-96D4-8D1BD242C841](attachments/A28F7548-DBFD-42F9-96D4-8D1BD242C841.mov)

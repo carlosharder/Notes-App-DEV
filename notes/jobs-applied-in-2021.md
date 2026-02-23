@@ -1,0 +1,7 @@
+---
+title: Jobs applied in 2021
+created: 2024-03-17T15:31:51
+modified: 2024-03-17T15:32:02
+---
+
+![1B73CE89-47C7-48AE-9EA5-39500FCE556B](images/1B73CE89-47C7-48AE-9EA5-39500FCE556B.png)

@@ -1,0 +1,10 @@
+---
+title: Wine list
+created: 2024-03-19T06:22:28
+modified: 2024-03-19T06:22:28
+---
+
+Goodwines
+
+
+![4D56592A-05B0-470B-A6D1-BAB1FB87BCCF](images/4D56592A-05B0-470B-A6D1-BAB1FB87BCCF.JPG)

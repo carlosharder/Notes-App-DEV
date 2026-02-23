@@ -1,0 +1,13 @@
+---
+title: Ray Dalio
+created: 2024-04-06T09:47:07
+modified: 2024-04-06T09:47:58
+---
+
+￼ 
+
+
+
+
+
+![1D4B8B56-E6A5-42CD-B72E-C6BDEF59E5E5](images/1D4B8B56-E6A5-42CD-B72E-C6BDEF59E5E5.jpeg)

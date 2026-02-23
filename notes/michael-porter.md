@@ -1,0 +1,10 @@
+---
+title: Michael Porter
+created: 2024-03-17T15:52:30
+modified: 2024-03-17T15:52:47
+---
+
+Strategy
+
+
+![DD3439DC-6CF6-4189-86CE-5D60BD2E08E8](images/DD3439DC-6CF6-4189-86CE-5D60BD2E08E8.png)

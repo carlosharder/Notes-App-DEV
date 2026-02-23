@@ -1,0 +1,12 @@
+---
+title: Gramática
+created: 2024-04-06T09:57:15
+modified: 2024-04-06T09:58:19
+---
+
+# Gramática
+
+￼
+
+
+![B981074C-599B-42E2-84F4-FC4DF4079CDD](images/B981074C-599B-42E2-84F4-FC4DF4079CDD.jpeg)
