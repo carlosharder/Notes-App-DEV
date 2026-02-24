@@ -1,7 +1,9 @@
 import os
+import sys
 import re
 import glob
 import json
+import threading
 from datetime import datetime
 from markupsafe import escape as html_escape
 import shutil
@@ -156,17 +158,41 @@ app.jinja_env.filters['preview'] = preview_text
 
 _notes_cache = {}
 _index_loaded = False
+_index_building = False
 
 
 def ensure_index():
-    global _index_loaded
-    if not _index_loaded:
+    global _index_loaded, _index_building
+    if _index_loaded:
+        return
+    if os.path.exists(INDEX_PATH):
+        # Fast path: load from cached JSON file
         load_index()
         _index_loaded = True
+    elif not _index_building:
+        # Slow path: no index file, rebuild in background
+        _index_building = True
+        print(f'[notes-app] No index found, rebuilding in background...', file=sys.stderr, flush=True)
+        t = threading.Thread(target=_background_rebuild, daemon=True)
+        t.start()
+
+
+def _background_rebuild():
+    global _index_loaded, _index_building
+    try:
+        rebuild_index()
+        _index_loaded = True
+        print(f'[notes-app] Index rebuilt: {len(_notes_cache)} notes', file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f'[notes-app] Index rebuild failed: {e}', file=sys.stderr, flush=True)
+    finally:
+        _index_building = False
 
 
 @app.before_request
 def _lazy_load_index():
+    if request.endpoint == 'healthz':
+        return
     ensure_index()
 
 
