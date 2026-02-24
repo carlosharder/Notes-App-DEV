@@ -4,7 +4,8 @@ services:
     name: notes-app
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: bash -c "mkdir -p /var/data/notes/images && cp -n notes/*.md /var/data/notes/ 2>/dev/null; cp -n notes/images/* /var/data/notes/images/ 2>/dev/null; rm -f /var/data/notes/.notes_index.json; gunicorn app:app --bind 0.0.0.0:$PORT"
+    startCommand: bash -c "mkdir -p /var/data/notes/images && cp -n notes/*.md /var/data/notes/ 2>/dev/null; cp -n notes/images/* /var/data/notes/images/ 2>/dev/null; gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --access-logfile -"
+    healthCheckPath: /healthz
     disk:
       name: notes-storage
       mountPath: /var/data/notes

@@ -155,6 +155,19 @@ app.jinja_env.filters['preview'] = preview_text
 # --- Metadata Index ---
 
 _notes_cache = {}
+_index_loaded = False
+
+
+def ensure_index():
+    global _index_loaded
+    if not _index_loaded:
+        load_index()
+        _index_loaded = True
+
+
+@app.before_request
+def _lazy_load_index():
+    ensure_index()
 
 
 def load_index():
@@ -490,6 +503,11 @@ def logout():
 
 # --- Main App Route ---
 
+@app.route('/healthz')
+def healthz():
+    return 'ok', 200
+
+
 @app.route('/')
 def home():
     if current_user.is_authenticated:
@@ -779,8 +797,6 @@ def api_image_serve(filename):
 
 
 # --- Startup ---
-
-load_index()
 
 
 if __name__ == '__main__':
