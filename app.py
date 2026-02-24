@@ -780,43 +780,6 @@ def api_image_serve(filename):
 
 # --- Startup ---
 
-def sync_repo_notes():
-    """Copy notes from the repo into NOTES_DIR if they don't already exist there.
-    This handles the case where NOTES_DIR is a persistent disk (e.g. on Render)
-    and the repo contains notes that haven't been copied over yet."""
-    repo_notes = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'notes')
-    if repo_notes == NOTES_DIR:
-        return  # Same directory, nothing to sync
-    if not os.path.isdir(repo_notes):
-        return
-
-    copied = 0
-    # Copy .md files
-    for f in os.listdir(repo_notes):
-        if f.endswith('.md'):
-            src = os.path.join(repo_notes, f)
-            dst = os.path.join(NOTES_DIR, f)
-            if not os.path.exists(dst):
-                shutil.copy2(src, dst)
-                copied += 1
-
-    # Copy images directory
-    repo_images = os.path.join(repo_notes, 'images')
-    dest_images = os.path.join(NOTES_DIR, 'images')
-    if os.path.isdir(repo_images):
-        os.makedirs(dest_images, exist_ok=True)
-        for f in os.listdir(repo_images):
-            src = os.path.join(repo_images, f)
-            dst = os.path.join(dest_images, f)
-            if os.path.isfile(src) and not os.path.exists(dst):
-                shutil.copy2(src, dst)
-
-    if copied > 0:
-        print(f'[sync] Copied {copied} notes from repo to {NOTES_DIR}')
-        rebuild_index()
-
-
-sync_repo_notes()
 load_index()
 
 
