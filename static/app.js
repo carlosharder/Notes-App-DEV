@@ -582,7 +582,7 @@
         }
 
         currentSlug = slug;
-        isEditing = false;
+        isEditing = true;
 
         // Update URL without reload
         history.pushState({ slug }, '', '/notes/' + slug);
@@ -605,7 +605,7 @@
             const resp = await fetch('/api/notes/' + slug);
             if (!resp.ok) throw new Error('Not found');
             const note = await resp.json();
-            renderNoteView(note);
+            renderNoteEditor(note);
         } catch (err) {
             contentBody.innerHTML = '<div class="empty-state"><div class="empty-state-text">Note not found</div></div>';
         }
