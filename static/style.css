@@ -226,14 +226,6 @@ html, body {
     gap: 4px;
 }
 
-.toolbar-logo {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    object-fit: cover;
-    margin-left: 8px;
-}
-
 .content-body {
     flex: 1;
     overflow-y: auto;
