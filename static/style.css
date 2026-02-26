@@ -976,6 +976,22 @@ html, body {
     text-align: center;
 }
 
+.login-alt {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 16px;
+}
+
+.login-alt a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.login-alt a:hover {
+    text-decoration: underline;
+}
+
 /* --- Loading Spinner --- */
 
 .loading-spinner {

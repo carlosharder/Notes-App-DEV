@@ -1,17 +1,14 @@
 import os
-import sys
 import re
-import glob
-import json
-import threading
+import shutil
 from datetime import datetime
 from markupsafe import escape as html_escape
-import shutil
 from flask import (
-    Flask, render_template, request, redirect, url_for, abort, flash, jsonify,
+    Flask, render_template, request, redirect, url_for, flash, jsonify,
     send_from_directory,
 )
 from werkzeug.utils import secure_filename
+from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager, UserMixin, login_user, logout_user,
     login_required, current_user,
@@ -22,36 +19,63 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-me')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB upload limit
 
-NOTES_DIR = os.environ.get(
-    'NOTES_DIR',
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'notes'),
+# Database config
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///notes.sqlite')
+# Render provides postgres:// but SQLAlchemy requires postgresql://
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Media directory (images + audio only; notes are in the database)
+MEDIA_DIR = os.environ.get(
+    'MEDIA_DIR',
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'media'),
 )
-os.makedirs(NOTES_DIR, exist_ok=True)
+os.makedirs(MEDIA_DIR, exist_ok=True)
 
-INDEX_PATH = os.path.join(NOTES_DIR, '.notes_index.json')
-
-# --- Authentication ---
+db = SQLAlchemy(app)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-AUTH_USERNAME = os.environ.get('APP_USERNAME', 'carlosharder')
-AUTH_PASSWORD_HASH = os.environ.get(
-    'PASSWORD_HASH', generate_password_hash('#2cats', method='pbkdf2:sha256')
-)
+
+# --- Models ---
+
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(256), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    notes = db.relationship('Note', backref='owner', lazy='dynamic',
+                            cascade='all, delete-orphan')
 
 
-class User(UserMixin):
-    def __init__(self, username):
-        self.id = username
+class Note(db.Model):
+    __tablename__ = 'notes'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    slug = db.Column(db.String(200), nullable=False)
+    title = db.Column(db.String(500), nullable=False)
+    body = db.Column(db.Text, nullable=False, default='')
+    created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    modified = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'slug', name='uq_user_slug'),
+        db.Index('ix_notes_user_modified', 'user_id', 'modified'),
+    )
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    if user_id == AUTH_USERNAME:
-        return User(user_id)
-    return None
+    return db.session.get(User, int(user_id))
 
 
 # --- Helpers ---
@@ -65,9 +89,12 @@ def slugify(title):
     return slug or 'untitled'
 
 
-def unique_slug(title, exclude_slug=None):
+def unique_slug(title, user_id, exclude_slug=None):
     base = slugify(title)
-    existing = set(_notes_cache.keys())
+    existing = {
+        n.slug for n in
+        Note.query.filter_by(user_id=user_id).with_entities(Note.slug).all()
+    }
     if exclude_slug:
         existing.discard(exclude_slug)
     if base not in existing:
@@ -76,47 +103,6 @@ def unique_slug(title, exclude_slug=None):
     while f'{base}-{n}' in existing:
         n += 1
     return f'{base}-{n}'
-
-
-def parse_note(filepath):
-    with open(filepath, 'r', encoding='utf-8') as f:
-        content = f.read()
-
-    slug = os.path.splitext(os.path.basename(filepath))[0]
-    title = slug
-    created = modified = datetime.now().isoformat(timespec='seconds')
-    body = content
-
-    if content.startswith('---'):
-        parts = content.split('---', 2)
-        if len(parts) >= 3:
-            front = parts[1].strip()
-            body = parts[2].strip()
-            for line in front.splitlines():
-                if ':' in line:
-                    key, val = line.split(':', 1)
-                    key, val = key.strip(), val.strip()
-                    if key == 'title':
-                        title = val
-                    elif key == 'created':
-                        created = val
-                    elif key == 'modified':
-                        modified = val
-
-    return {
-        'slug': slug,
-        'title': title,
-        'created': created,
-        'modified': modified,
-        'body': body,
-    }
-
-
-def write_note(slug, title, body, created, modified):
-    filepath = os.path.join(NOTES_DIR, f'{slug}.md')
-    front = f'---\ntitle: {title}\ncreated: {created}\nmodified: {modified}\n---\n\n'
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(front + body)
 
 
 def preview_text(body, length=120):
@@ -129,15 +115,15 @@ def preview_text(body, length=120):
 
 def format_date(iso_str):
     try:
-        dt = datetime.fromisoformat(iso_str)
+        dt = datetime.fromisoformat(iso_str) if isinstance(iso_str, str) else iso_str
         return dt.strftime('%b %d, %Y %H:%M')
     except (ValueError, TypeError):
-        return iso_str
+        return str(iso_str)
 
 
 def short_date(iso_str):
     try:
-        dt = datetime.fromisoformat(iso_str)
+        dt = datetime.fromisoformat(iso_str) if isinstance(iso_str, str) else iso_str
         now = datetime.now()
         if dt.date() == now.date():
             return dt.strftime('%I:%M %p').lstrip('0')
@@ -146,7 +132,7 @@ def short_date(iso_str):
         else:
             return dt.strftime('%m/%d/%y')
     except (ValueError, TypeError):
-        return iso_str
+        return str(iso_str)
 
 
 app.jinja_env.filters['format_date'] = format_date
@@ -154,116 +140,24 @@ app.jinja_env.filters['short_date'] = short_date
 app.jinja_env.filters['preview'] = preview_text
 
 
-# --- Metadata Index ---
-
-_notes_cache = {}
-_index_loaded = False
-_index_building = False
-
-
-def ensure_index():
-    global _index_loaded, _index_building
-    if _index_loaded:
-        return
-    if os.path.exists(INDEX_PATH):
-        # Fast path: load from cached JSON file
-        load_index()
-        _index_loaded = True
-    elif not _index_building:
-        # Slow path: no index file, rebuild in background
-        _index_building = True
-        print(f'[notes-app] No index found, rebuilding in background...', file=sys.stderr, flush=True)
-        t = threading.Thread(target=_background_rebuild, daemon=True)
-        t.start()
-
-
-def _background_rebuild():
-    global _index_loaded, _index_building
-    try:
-        rebuild_index()
-        _index_loaded = True
-        print(f'[notes-app] Index rebuilt: {len(_notes_cache)} notes', file=sys.stderr, flush=True)
-    except Exception as e:
-        print(f'[notes-app] Index rebuild failed: {e}', file=sys.stderr, flush=True)
-    finally:
-        _index_building = False
-
-
-@app.before_request
-def _lazy_load_index():
-    if request.endpoint == 'healthz':
-        return
-    ensure_index()
-
-
-def load_index():
-    global _notes_cache
-    if os.path.exists(INDEX_PATH):
-        try:
-            with open(INDEX_PATH, 'r') as f:
-                data = json.load(f)
-            _notes_cache = data.get('notes', {})
-        except (json.JSONDecodeError, IOError):
-            rebuild_index()
-    else:
-        rebuild_index()
-
-
-def rebuild_index():
-    global _notes_cache
-    _notes_cache = {}
-    for filepath in glob.glob(os.path.join(NOTES_DIR, '*.md')):
-        note = parse_note(filepath)
-        _notes_cache[note['slug']] = {
-            'title': note['title'],
-            'slug': note['slug'],
-            'created': note['created'],
-            'modified': note['modified'],
-            'preview': preview_text(note['body']),
-        }
-    save_index()
-
-
-def save_index():
-    try:
-        with open(INDEX_PATH, 'w') as f:
-            json.dump({'version': 1, 'notes': _notes_cache}, f)
-    except IOError:
-        pass
-
-
-def update_index_entry(slug, title, created, modified, body):
-    _notes_cache[slug] = {
-        'title': title,
-        'slug': slug,
-        'created': created,
-        'modified': modified,
-        'preview': preview_text(body),
-    }
-    save_index()
-
-
-def remove_index_entry(slug):
-    _notes_cache.pop(slug, None)
-    save_index()
+def user_media_path(user_id, *parts):
+    """Build a path under MEDIA_DIR/{user_id}/..."""
+    return os.path.join(MEDIA_DIR, str(user_id), *parts)
 
 
 # --- Plain-Text Rendering ---
-# Notes are stored as plain text (no markdown). Special line prefixes:
-#   [section] Text      -> large heading
-#   [subsection] Text   -> mid-size heading
-#   - [ ] / - [x]       -> checklist items
-#   [[Note Title]]       -> inter-note link
 
-def render_note(text, slug=None):
-    title_map = {m['title'].lower(): m['slug'] for m in _notes_cache.values()}
+def render_note(text, slug=None, user_id=None):
+    if user_id:
+        notes = Note.query.filter_by(user_id=user_id).with_entities(Note.title, Note.slug).all()
+        title_map = {n.title.lower(): n.slug for n in notes}
+    else:
+        title_map = {}
 
     def resolve_hyperlinks(line_html):
-        """Convert [text](url) to <a> tags with target=_blank, operating on already-escaped HTML."""
         def replace_hyperlink(match):
             text = match.group(1)
             url = match.group(2)
-            # text and url are already HTML-escaped from the line_html
             return f'<a href="{url}" class="hyperlink" target="_blank" rel="noopener noreferrer">{text}</a>'
         return re.sub(r'\[(.+?)\]\((https?://[^\s)]+)\)', replace_hyperlink, line_html)
 
@@ -277,7 +171,6 @@ def render_note(text, slug=None):
         return re.sub(r'\[\[(.+?)\]\]', replace_link, line_html)
 
     def resolve_inline_formatting(line_html):
-        """Convert **bold**, *italic*, __underline__, ~~strike~~ to HTML tags."""
         line_html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', line_html)
         line_html = re.sub(r'(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)', r'<i>\1</i>', line_html)
         line_html = re.sub(r'__(.+?)__', r'<u>\1</u>', line_html)
@@ -285,7 +178,6 @@ def render_note(text, slug=None):
         return line_html
 
     def resolve_inline(line_html):
-        """Apply all inline transformations: hyperlinks, wiki links, then formatting."""
         line_html = resolve_hyperlinks(line_html)
         line_html = resolve_wiki_links(line_html)
         line_html = resolve_inline_formatting(line_html)
@@ -513,11 +405,53 @@ def login():
     if request.method == 'POST':
         username = request.form.get('username', '')
         password = request.form.get('password', '')
-        if username == AUTH_USERNAME and check_password_hash(AUTH_PASSWORD_HASH, password):
-            login_user(User(username))
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password_hash, password):
+            login_user(user)
             return redirect(url_for('app_shell'))
         flash('Invalid username or password.')
     return render_template('login.html')
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('app_shell'))
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+
+        errors = []
+        if not username or len(username) < 3:
+            errors.append('Username must be at least 3 characters.')
+        if not email or '@' not in email:
+            errors.append('Valid email required.')
+        if not password or len(password) < 8:
+            errors.append('Password must be at least 8 characters.')
+        if User.query.filter_by(username=username).first():
+            errors.append('Username already taken.')
+        if User.query.filter_by(email=email).first():
+            errors.append('Email already registered.')
+
+        if errors:
+            for e in errors:
+                flash(e)
+        else:
+            user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password, method='pbkdf2:sha256'),
+            )
+            db.session.add(user)
+            db.session.commit()
+            # Create media directories for the new user
+            os.makedirs(user_media_path(user.id, 'images'), exist_ok=True)
+            os.makedirs(user_media_path(user.id, 'audio'), exist_ok=True)
+            login_user(user)
+            return redirect(url_for('app_shell'))
+
+    return render_template('register.html')
 
 
 @app.route('/logout')
@@ -527,7 +461,7 @@ def logout():
     return redirect(url_for('login'))
 
 
-# --- Main App Route ---
+# --- Main App Routes ---
 
 @app.route('/healthz')
 def healthz():
@@ -564,36 +498,33 @@ def service_worker():
 @app.route('/api/notes')
 @login_required
 def api_notes_list():
-    q = request.args.get('q', '').strip().lower()
+    q = request.args.get('q', '').strip()
     page = int(request.args.get('page', 1))
     limit = int(request.args.get('limit', 50))
 
-    notes = sorted(_notes_cache.values(), key=lambda n: n['modified'], reverse=True)
+    query = Note.query.filter_by(user_id=current_user.id)
 
     if q:
-        # Search in cache first (title + preview)
-        filtered = [
-            n for n in notes
-            if q in n['title'].lower() or q in n['preview'].lower()
-        ]
-        # If few results, also search full body
-        if len(filtered) < 5:
-            cached_slugs = {n['slug'] for n in filtered}
-            for n in notes:
-                if n['slug'] not in cached_slugs:
-                    filepath = os.path.join(NOTES_DIR, f"{n['slug']}.md")
-                    if os.path.isfile(filepath):
-                        note = parse_note(filepath)
-                        if q in note['body'].lower():
-                            filtered.append(n)
-        notes = filtered
+        pattern = f'%{q}%'
+        query = query.filter(
+            db.or_(
+                Note.title.ilike(pattern),
+                Note.body.ilike(pattern),
+            )
+        )
 
-    total = len(notes)
-    start = (page - 1) * limit
-    end = start + limit
+    query = query.order_by(Note.modified.desc())
+    total = query.count()
+    notes = query.offset((page - 1) * limit).limit(limit).all()
 
     return jsonify({
-        'notes': notes[start:end],
+        'notes': [{
+            'slug': n.slug,
+            'title': n.title,
+            'modified': n.modified.isoformat(timespec='seconds'),
+            'created': n.created.isoformat(timespec='seconds'),
+            'preview': preview_text(n.body),
+        } for n in notes],
         'total': total,
         'page': page,
     })
@@ -602,18 +533,17 @@ def api_notes_list():
 @app.route('/api/notes/<slug>')
 @login_required
 def api_note_get(slug):
-    filepath = os.path.join(NOTES_DIR, f'{slug}.md')
-    if not os.path.isfile(filepath):
+    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    if not note:
         return jsonify({'error': 'not found'}), 404
-    note = parse_note(filepath)
-    html = render_note(note['body'], slug)
+    html = render_note(note.body, slug, current_user.id)
     return jsonify({
-        'slug': note['slug'],
-        'title': note['title'],
-        'body': note['body'],
+        'slug': note.slug,
+        'title': note.title,
+        'body': note.body,
         'html': html,
-        'created': note['created'],
-        'modified': note['modified'],
+        'created': note.created.isoformat(timespec='seconds'),
+        'modified': note.modified.isoformat(timespec='seconds'),
     })
 
 
@@ -623,39 +553,42 @@ def api_note_create():
     data = request.get_json()
     title = (data.get('title') or '').strip() or 'Untitled'
     body = data.get('body', '')
-    slug = unique_slug(title)
-    now = datetime.now().isoformat(timespec='seconds')
-    write_note(slug, title, body, now, now)
-    update_index_entry(slug, title, now, now, body)
+    slug = unique_slug(title, current_user.id)
+    now = datetime.utcnow()
+
+    note = Note(user_id=current_user.id, slug=slug, title=title,
+                body=body, created=now, modified=now)
+    db.session.add(note)
+    db.session.commit()
+
     return jsonify({'slug': slug, 'title': title}), 201
 
 
 @app.route('/api/notes/<slug>', methods=['PUT'])
 @login_required
 def api_note_update(slug):
-    filepath = os.path.join(NOTES_DIR, f'{slug}.md')
-    if not os.path.isfile(filepath):
+    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    if not note:
         return jsonify({'error': 'not found'}), 404
 
-    note = parse_note(filepath)
     data = request.get_json()
-    title = (data.get('title') or '').strip() or note['title']
-    body = data.get('body', note['body'])
-    now = datetime.now().isoformat(timespec='seconds')
+    title = (data.get('title') or '').strip() or note.title
+    body = data.get('body', note.body)
 
-    new_slug = unique_slug(title, exclude_slug=slug)
+    new_slug = unique_slug(title, current_user.id, exclude_slug=slug)
     if new_slug != slug:
-        os.remove(filepath)
-        remove_index_entry(slug)
-        # Rename media directory if it exists
-        old_media = os.path.join(NOTES_DIR, 'media', slug)
-        new_media = os.path.join(NOTES_DIR, 'media', new_slug)
+        # Rename audio directory if it exists
+        old_media = user_media_path(current_user.id, 'audio', slug)
+        new_media = user_media_path(current_user.id, 'audio', new_slug)
         if os.path.isdir(old_media):
             os.makedirs(os.path.dirname(new_media), exist_ok=True)
             os.rename(old_media, new_media)
 
-    write_note(new_slug, title, body, note['created'], now)
-    update_index_entry(new_slug, title, note['created'], now, body)
+    note.slug = new_slug
+    note.title = title
+    note.body = body
+    note.modified = datetime.utcnow()
+    db.session.commit()
 
     return jsonify({'slug': new_slug, 'title': title})
 
@@ -663,41 +596,38 @@ def api_note_update(slug):
 @app.route('/api/notes/<slug>', methods=['DELETE'])
 @login_required
 def api_note_delete(slug):
-    filepath = os.path.join(NOTES_DIR, f'{slug}.md')
-    if os.path.isfile(filepath):
-        os.remove(filepath)
-    # Also delete any attached audio files
-    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    if note:
+        db.session.delete(note)
+        db.session.commit()
+    # Delete attached audio
+    media_dir = user_media_path(current_user.id, 'audio', slug)
     if os.path.isdir(media_dir):
         shutil.rmtree(media_dir)
-    remove_index_entry(slug)
     return jsonify({'ok': True})
 
 
 @app.route('/api/notes/<slug>/toggle', methods=['POST'])
 @login_required
 def api_toggle_checkbox(slug):
-    filepath = os.path.join(NOTES_DIR, f'{slug}.md')
-    if not os.path.isfile(filepath):
+    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    if not note:
         return jsonify({'error': 'not found'}), 404
 
     data = request.get_json()
     line_num = data.get('line')
     checked = data.get('checked')
 
-    note = parse_note(filepath)
-    lines = note['body'].split('\n')
-
+    lines = note.body.split('\n')
     if 0 <= line_num < len(lines):
         if checked:
             lines[line_num] = re.sub(r'\[ \]', '[x]', lines[line_num], count=1)
         else:
             lines[line_num] = re.sub(r'\[x\]', '[ ]', lines[line_num], count=1)
 
-    new_body = '\n'.join(lines)
-    now = datetime.now().isoformat(timespec='seconds')
-    write_note(slug, note['title'], new_body, note['created'], now)
-    update_index_entry(slug, note['title'], note['created'], now, new_body)
+    note.body = '\n'.join(lines)
+    note.modified = datetime.utcnow()
+    db.session.commit()
 
     return jsonify({'ok': True})
 
@@ -705,12 +635,10 @@ def api_toggle_checkbox(slug):
 @app.route('/api/notes/titles')
 @login_required
 def api_note_titles():
-    titles = [
-        {'title': m['title'], 'slug': m['slug']}
-        for m in _notes_cache.values()
-    ]
-    titles.sort(key=lambda t: t['title'].lower())
-    return jsonify(titles)
+    notes = Note.query.filter_by(user_id=current_user.id)\
+        .with_entities(Note.title, Note.slug)\
+        .order_by(Note.title).all()
+    return jsonify([{'title': n.title, 'slug': n.slug} for n in notes])
 
 
 # --- Audio API ---
@@ -722,8 +650,8 @@ ALLOWED_AUDIO_EXT = {'.mp3'}
 @login_required
 def api_audio_upload(slug):
     """Upload an MP3 file attached to a note."""
-    filepath = os.path.join(NOTES_DIR, f'{slug}.md')
-    if not os.path.isfile(filepath):
+    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    if not note:
         return jsonify({'error': 'Note not found'}), 404
 
     if 'file' not in request.files:
@@ -738,11 +666,10 @@ def api_audio_upload(slug):
     if ext not in ALLOWED_AUDIO_EXT:
         return jsonify({'error': 'Only .mp3 files are allowed'}), 400
 
-    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    media_dir = user_media_path(current_user.id, 'audio', slug)
     os.makedirs(media_dir, exist_ok=True)
 
     dest = os.path.join(media_dir, filename)
-    # Avoid overwriting — append number if exists
     base, ext = os.path.splitext(filename)
     counter = 2
     while os.path.exists(dest):
@@ -758,7 +685,7 @@ def api_audio_upload(slug):
 @login_required
 def api_audio_serve(slug, filename):
     """Serve an MP3 file for playback."""
-    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    media_dir = user_media_path(current_user.id, 'audio', slug)
     safe_name = secure_filename(filename)
     if not os.path.isfile(os.path.join(media_dir, safe_name)):
         return jsonify({'error': 'Audio not found'}), 404
@@ -769,12 +696,11 @@ def api_audio_serve(slug, filename):
 @login_required
 def api_audio_delete(slug, filename):
     """Delete a specific MP3 attached to a note."""
-    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    media_dir = user_media_path(current_user.id, 'audio', slug)
     safe_name = secure_filename(filename)
     fpath = os.path.join(media_dir, safe_name)
     if os.path.isfile(fpath):
         os.remove(fpath)
-        # Remove empty media dir
         if os.path.isdir(media_dir) and not os.listdir(media_dir):
             os.rmdir(media_dir)
         return jsonify({'ok': True})
@@ -785,7 +711,7 @@ def api_audio_delete(slug, filename):
 @login_required
 def api_audio_list(slug):
     """List all MP3s attached to a note."""
-    media_dir = os.path.join(NOTES_DIR, 'media', slug)
+    media_dir = user_media_path(current_user.id, 'audio', slug)
     files = []
     if os.path.isdir(media_dir):
         for fname in sorted(os.listdir(media_dir)):
@@ -806,8 +732,8 @@ ALLOWED_IMAGE_EXT = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
 @app.route('/api/images/<filename>')
 @login_required
 def api_image_serve(filename):
-    """Serve an image file from the shared images directory."""
-    images_dir = os.path.join(NOTES_DIR, 'images')
+    """Serve an image file from the user's images directory."""
+    images_dir = user_media_path(current_user.id, 'images')
     safe_name = secure_filename(filename)
     if not safe_name:
         return jsonify({'error': 'Invalid filename'}), 400
@@ -824,6 +750,8 @@ def api_image_serve(filename):
 
 # --- Startup ---
 
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5001))

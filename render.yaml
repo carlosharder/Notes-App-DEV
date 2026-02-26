@@ -4,20 +4,26 @@ services:
     name: notes-app
     plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: bash -c "mkdir -p /var/data/notes/images && cp -n notes/*.md /var/data/notes/ 2>/dev/null; cp -n notes/images/* /var/data/notes/images/ 2>/dev/null; gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 300 --access-logfile -"
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile -
     healthCheckPath: /healthz
     disk:
-      name: notes-storage
-      mountPath: /var/data/notes
+      name: media-storage
+      mountPath: /var/data/media
       sizeGB: 1
     envVars:
       - key: SECRET_KEY
         generateValue: true
-      - key: APP_USERNAME
-        value: carlosharder
-      - key: PASSWORD_HASH
-        value: "pbkdf2:sha256:1000000$oz91NOa38dzvn3pz$d2fe5614d8d37ceb1bafd2cc7f016f98602cb02def61201464f05bd288b226cc"
-      - key: NOTES_DIR
-        value: /var/data/notes
+      - key: DATABASE_URL
+        fromDatabase:
+          name: notes-db
+          property: connectionString
+      - key: MEDIA_DIR
+        value: /var/data/media
       - key: PYTHON_VERSION
         value: "3.11.6"
+
+databases:
+  - name: notes-db
+    plan: starter
+    databaseName: notes
+    user: notes_user
