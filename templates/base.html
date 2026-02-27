@@ -28,11 +28,24 @@
             <div class="sidebar-search">
                 <input type="search" id="sidebar-search" placeholder="Search" autocomplete="off">
             </div>
+            <div class="sidebar-tabs">
+                <button class="sidebar-tab active" id="tab-my-notes" data-tab="mine">My Notes</button>
+                <button class="sidebar-tab" id="tab-shared" data-tab="shared">Shared</button>
+            </div>
             <div class="sidebar-list" id="sidebar-list">
                 <!-- Loaded via JS -->
             </div>
             <div class="sidebar-footer">
-                <span class="note-count" id="sidebar-count"></span>
+                <div class="sidebar-footer-left">
+                    <button class="icon-btn" id="download-all-btn" title="Download all notes as ZIP">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                    </button>
+                    <span class="note-count" id="sidebar-count"></span>
+                </div>
                 <a href="/logout" class="icon-btn" title="Logout" style="color: var(--text-tertiary); text-decoration: none;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
@@ -55,6 +68,15 @@
                     <span class="save-indicator" id="save-indicator"></span>
                 </div>
                 <div class="toolbar-right">
+                    <button class="icon-btn" id="share-btn" title="Share" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="18" cy="5" r="3"/>
+                            <circle cx="6" cy="12" r="3"/>
+                            <circle cx="18" cy="19" r="3"/>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                        </svg>
+                    </button>
                     <button class="icon-btn" id="edit-btn" title="Edit (Ctrl+E)" style="display:none;">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>

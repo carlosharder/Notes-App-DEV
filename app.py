@@ -1,11 +1,13 @@
+import io
 import os
 import re
 import shutil
+import zipfile
 from datetime import datetime
 from markupsafe import escape as html_escape
 from flask import (
     Flask, render_template, request, redirect, url_for, flash, jsonify,
-    send_from_directory,
+    send_from_directory, send_file,
 )
 from werkzeug.utils import secure_filename
 from flask_sqlalchemy import SQLAlchemy
@@ -70,6 +72,23 @@ class Note(db.Model):
     __table_args__ = (
         db.UniqueConstraint('user_id', 'slug', name='uq_user_slug'),
         db.Index('ix_notes_user_modified', 'user_id', 'modified'),
+    )
+
+
+class NoteShare(db.Model):
+    __tablename__ = 'note_shares'
+
+    id = db.Column(db.Integer, primary_key=True)
+    note_id = db.Column(db.Integer, db.ForeignKey('notes.id', ondelete='CASCADE'), nullable=False)
+    shared_with_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    permission = db.Column(db.String(10), nullable=False, default='edit')  # 'view' or 'edit'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    note = db.relationship('Note', backref=db.backref('shares', lazy='dynamic', cascade='all, delete-orphan'))
+    shared_with = db.relationship('User', foreign_keys=[shared_with_id])
+
+    __table_args__ = (
+        db.UniqueConstraint('note_id', 'shared_with_id', name='uq_note_share'),
     )
 
 
@@ -536,10 +555,11 @@ def api_notes_list():
 @app.route('/api/notes/<slug>')
 @login_required
 def api_note_get(slug):
-    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    note, permission = get_note_with_access(slug, current_user.id)
     if not note:
         return jsonify({'error': 'not found'}), 404
-    html = render_note(note.body, slug, current_user.id)
+    html = render_note(note.body, slug, note.user_id)
+    owner = User.query.get(note.user_id)
     return jsonify({
         'slug': note.slug,
         'title': note.title,
@@ -547,6 +567,9 @@ def api_note_get(slug):
         'html': html,
         'created': note.created.isoformat(timespec='seconds'),
         'modified': note.modified.isoformat(timespec='seconds'),
+        'permission': permission,
+        'owner': owner.username if owner else None,
+        'is_own': note.user_id == current_user.id,
     })
 
 
@@ -570,19 +593,21 @@ def api_note_create():
 @app.route('/api/notes/<slug>', methods=['PUT'])
 @login_required
 def api_note_update(slug):
-    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    note, permission = get_note_with_access(slug, current_user.id)
     if not note:
         return jsonify({'error': 'not found'}), 404
+    if permission == 'view':
+        return jsonify({'error': 'read-only access'}), 403
 
     data = request.get_json()
     title = (data.get('title') or '').strip() or note.title
     body = data.get('body', note.body)
 
-    new_slug = unique_slug(title, current_user.id, exclude_slug=slug)
+    new_slug = unique_slug(title, note.user_id, exclude_slug=slug)
     if new_slug != slug:
         # Rename audio directory if it exists
-        old_media = user_media_path(current_user.id, 'audio', slug)
-        new_media = user_media_path(current_user.id, 'audio', new_slug)
+        old_media = user_media_path(note.user_id, 'audio', slug)
+        new_media = user_media_path(note.user_id, 'audio', new_slug)
         if os.path.isdir(old_media):
             os.makedirs(os.path.dirname(new_media), exist_ok=True)
             os.rename(old_media, new_media)
@@ -613,9 +638,11 @@ def api_note_delete(slug):
 @app.route('/api/notes/<slug>/toggle', methods=['POST'])
 @login_required
 def api_toggle_checkbox(slug):
-    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    note, permission = get_note_with_access(slug, current_user.id)
     if not note:
         return jsonify({'error': 'not found'}), 404
+    if permission == 'view':
+        return jsonify({'error': 'read-only access'}), 403
 
     data = request.get_json()
     line_num = data.get('line')
@@ -688,7 +715,10 @@ def api_audio_upload(slug):
 @login_required
 def api_audio_serve(slug, filename):
     """Serve an MP3 file for playback."""
-    media_dir = user_media_path(current_user.id, 'audio', slug)
+    note, permission = get_note_with_access(slug, current_user.id)
+    if not note:
+        return jsonify({'error': 'Audio not found'}), 404
+    media_dir = user_media_path(note.user_id, 'audio', slug)
     safe_name = secure_filename(filename)
     if not os.path.isfile(os.path.join(media_dir, safe_name)):
         return jsonify({'error': 'Audio not found'}), 404
@@ -733,10 +763,11 @@ ALLOWED_IMAGE_EXT = {'.png', '.jpg', '.jpeg', '.gif', '.webp'}
 
 
 @app.route('/api/images/<filename>')
+@app.route('/api/images/<int:owner_id>/<filename>')
 @login_required
-def api_image_serve(filename):
+def api_image_serve(filename, owner_id=None):
     """Serve an image file from the user's images directory."""
-    images_dir = user_media_path(current_user.id, 'images')
+    images_dir = user_media_path(owner_id or current_user.id, 'images')
     safe_name = secure_filename(filename)
     if not safe_name:
         return jsonify({'error': 'Invalid filename'}), 400
@@ -749,6 +780,150 @@ def api_image_serve(filename):
     mime_map = {'.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
                 '.gif': 'image/gif', '.webp': 'image/webp'}
     return send_from_directory(images_dir, safe_name, mimetype=mime_map.get(ext, 'image/png'))
+
+
+# --- Helper: access check for shared notes ---
+
+def get_note_with_access(slug, user_id):
+    """Return (note, permission) if user owns or has shared access, else (None, None)."""
+    note = Note.query.filter_by(user_id=user_id, slug=slug).first()
+    if note:
+        return note, 'owner'
+    # Check shared notes: find note by slug where shared with this user
+    share = (
+        db.session.query(NoteShare, Note)
+        .join(Note, NoteShare.note_id == Note.id)
+        .filter(NoteShare.shared_with_id == user_id, Note.slug == slug)
+        .first()
+    )
+    if share:
+        return share.Note, share.NoteShare.permission
+    return None, None
+
+
+# --- ZIP Download ---
+
+@app.route('/api/notes/download')
+@login_required
+def api_notes_download():
+    """Download all user's notes as a ZIP file."""
+    notes = Note.query.filter_by(user_id=current_user.id)\
+        .order_by(Note.modified.desc()).all()
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for note in notes:
+            filename = note.slug + '.txt'
+            content = note.title + '\n' + ('=' * len(note.title)) + '\n\n' + note.body
+            zf.writestr(filename, content)
+
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'notes-{current_user.username}.zip',
+    )
+
+
+# --- Share API ---
+
+@app.route('/api/notes/<slug>/share', methods=['POST'])
+@login_required
+def api_note_share(slug):
+    """Share a note with another user by username."""
+    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    if not note:
+        return jsonify({'error': 'Note not found'}), 404
+
+    data = request.get_json()
+    username = (data.get('username') or '').strip()
+    permission = data.get('permission', 'edit')
+
+    if permission not in ('view', 'edit'):
+        return jsonify({'error': 'Permission must be "view" or "edit"'}), 400
+
+    if not username:
+        return jsonify({'error': 'Username required'}), 400
+
+    target_user = User.query.filter_by(username=username).first()
+    if not target_user:
+        return jsonify({'error': 'User not found'}), 404
+
+    if target_user.id == current_user.id:
+        return jsonify({'error': 'Cannot share with yourself'}), 400
+
+    existing = NoteShare.query.filter_by(
+        note_id=note.id, shared_with_id=target_user.id
+    ).first()
+    if existing:
+        existing.permission = permission
+        db.session.commit()
+        return jsonify({'ok': True, 'message': 'Permission updated'})
+
+    share = NoteShare(
+        note_id=note.id,
+        shared_with_id=target_user.id,
+        permission=permission,
+    )
+    db.session.add(share)
+    db.session.commit()
+    return jsonify({'ok': True, 'message': f'Shared with {username}'}), 201
+
+
+@app.route('/api/notes/<slug>/share/<int:share_id>', methods=['DELETE'])
+@login_required
+def api_note_unshare(slug, share_id):
+    """Remove a collaborator from a note."""
+    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    if not note:
+        return jsonify({'error': 'Note not found'}), 404
+
+    share = NoteShare.query.filter_by(id=share_id, note_id=note.id).first()
+    if share:
+        db.session.delete(share)
+        db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/notes/<slug>/collaborators')
+@login_required
+def api_note_collaborators(slug):
+    """List collaborators for a note."""
+    note = Note.query.filter_by(user_id=current_user.id, slug=slug).first()
+    if not note:
+        return jsonify({'error': 'Note not found'}), 404
+
+    shares = NoteShare.query.filter_by(note_id=note.id).all()
+    return jsonify([{
+        'id': s.id,
+        'username': s.shared_with.username,
+        'permission': s.permission,
+    } for s in shares])
+
+
+@app.route('/api/shared')
+@login_required
+def api_shared_notes():
+    """List notes shared with current user."""
+    shares = (
+        db.session.query(NoteShare, Note, User)
+        .join(Note, NoteShare.note_id == Note.id)
+        .join(User, Note.user_id == User.id)
+        .filter(NoteShare.shared_with_id == current_user.id)
+        .order_by(Note.modified.desc())
+        .all()
+    )
+    return jsonify([{
+        'slug': note.slug,
+        'title': note.title,
+        'modified': note.modified.isoformat(timespec='seconds'),
+        'created': note.created.isoformat(timespec='seconds'),
+        'preview': preview_text(note.body),
+        'owner': owner.username,
+        'permission': share.permission,
+        'shared': True,
+    } for share, note, owner in shares])
 
 
 # --- Startup ---

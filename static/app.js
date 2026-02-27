@@ -13,6 +13,9 @@
     let saveTimeout = null;
     let noteTitles = [];
     let autocompleteIdx = -1;
+    let currentNoteIsOwn = true;
+    let currentNotePermission = 'owner';
+    let currentTab = 'mine'; // 'mine' or 'shared'
 
     const PAGE_SIZE = 50;
     const AUTOSAVE_DELAY = 1500;
@@ -29,6 +32,10 @@
     const saveIndicator = document.getElementById('save-indicator');
     const mobileBackBtn = document.getElementById('mobile-back-btn');
     const autocompleteEl = document.getElementById('link-autocomplete');
+    const shareBtn = document.getElementById('share-btn');
+    const downloadBtn = document.getElementById('download-all-btn');
+    const tabMyNotes = document.getElementById('tab-my-notes');
+    const tabShared = document.getElementById('tab-shared');
 
     // --- Sidebar Note Loading ---
 
@@ -36,32 +43,57 @@
         if (loading) return;
         loading = true;
 
-        const params = new URLSearchParams({ page, limit: PAGE_SIZE });
-        if (query) params.set('q', query);
-
         try {
-            const resp = await fetch('/api/notes?' + params);
-            const data = await resp.json();
+            if (currentTab === 'shared') {
+                // Load shared notes
+                const resp = await fetch('/api/shared');
+                const notes = await resp.json();
 
-            if (!append) {
-                sidebarList.innerHTML = '';
-            }
+                if (!append) sidebarList.innerHTML = '';
 
-            if (data.notes.length === 0 && !append) {
-                sidebarList.innerHTML = '<div class="sidebar-empty">No notes found</div>';
-            }
+                const filtered = query
+                    ? notes.filter(n => n.title.toLowerCase().includes(query.toLowerCase()))
+                    : notes;
 
-            data.notes.forEach(note => {
-                const el = createNoteItem(note);
-                sidebarList.appendChild(el);
-            });
+                if (filtered.length === 0) {
+                    sidebarList.innerHTML = '<div class="sidebar-empty">No shared notes</div>';
+                }
 
-            if (data.notes.length < PAGE_SIZE) {
+                filtered.forEach(note => {
+                    const el = createNoteItem(note, true);
+                    sidebarList.appendChild(el);
+                });
+
                 allLoaded = true;
-            }
+                if (sidebarCount) {
+                    sidebarCount.textContent = filtered.length + ' shared';
+                }
+            } else {
+                // Load own notes
+                const params = new URLSearchParams({ page, limit: PAGE_SIZE });
+                if (query) params.set('q', query);
 
-            if (sidebarCount) {
-                sidebarCount.textContent = data.total + ' note' + (data.total !== 1 ? 's' : '');
+                const resp = await fetch('/api/notes?' + params);
+                const data = await resp.json();
+
+                if (!append) sidebarList.innerHTML = '';
+
+                if (data.notes.length === 0 && !append) {
+                    sidebarList.innerHTML = '<div class="sidebar-empty">No notes found</div>';
+                }
+
+                data.notes.forEach(note => {
+                    const el = createNoteItem(note, false);
+                    sidebarList.appendChild(el);
+                });
+
+                if (data.notes.length < PAGE_SIZE) {
+                    allLoaded = true;
+                }
+
+                if (sidebarCount) {
+                    sidebarCount.textContent = data.total + ' note' + (data.total !== 1 ? 's' : '');
+                }
             }
         } catch (err) {
             console.error('Failed to load notes:', err);
@@ -70,15 +102,18 @@
         loading = false;
     }
 
-    function createNoteItem(note) {
+    function createNoteItem(note, isShared) {
         const el = document.createElement('div');
         el.className = 'note-item' + (note.slug === currentSlug ? ' active' : '');
         el.dataset.slug = note.slug;
 
         const shortDate = formatShortDate(note.modified);
+        const ownerBadge = isShared && note.owner
+            ? '<span class="note-item-owner">' + escapeHtml(note.owner) + '</span>'
+            : '';
 
         el.innerHTML =
-            '<div class="note-item-title">' + escapeHtml(note.title) + '</div>' +
+            '<div class="note-item-title">' + escapeHtml(note.title) + ownerBadge + '</div>' +
             '<div class="note-item-meta">' +
                 '<span class="note-item-date">' + shortDate + '</span>' +
                 '<span class="note-item-preview">' + escapeHtml(note.preview || '') + '</span>' +
@@ -605,16 +640,25 @@
             const resp = await fetch('/api/notes/' + slug);
             if (!resp.ok) throw new Error('Not found');
             const note = await resp.json();
-            renderNoteEditor(note);
+            currentNoteIsOwn = note.is_own;
+            currentNotePermission = note.permission;
+            if (note.permission === 'view') {
+                renderNoteView(note);
+            } else {
+                renderNoteEditor(note);
+            }
         } catch (err) {
             contentBody.innerHTML = '<div class="empty-state"><div class="empty-state-text">Note not found</div></div>';
         }
     }
 
     function renderNoteView(note) {
+        var ownerInfo = (!note.is_own && note.owner)
+            ? '<span class="note-shared-badge">Shared by ' + escapeHtml(note.owner) + (note.permission === 'view' ? ' (view only)' : '') + '</span>'
+            : '';
         contentBody.innerHTML =
             '<div class="note-view">' +
-                '<h1 class="note-title-display">' + escapeHtml(note.title) + '</h1>' +
+                '<h1 class="note-title-display">' + escapeHtml(note.title) + ownerInfo + '</h1>' +
                 '<div class="note-dates">' +
                     'Created ' + formatFullDate(note.created) +
                     ' &middot; Modified ' + formatFullDate(note.modified) +
@@ -629,8 +673,12 @@
     // =====================================================================
 
     function renderNoteEditor(note) {
+        var sharedBanner = (!note.is_own && note.owner)
+            ? '<div class="note-shared-badge" style="margin-bottom:12px;display:inline-flex;">Shared by ' + escapeHtml(note.owner) + '</div>'
+            : '';
         contentBody.innerHTML =
             '<div class="note-editor">' +
+                sharedBanner +
                 '<input type="text" class="note-title-input" id="editor-title" placeholder="Title" value="' + escapeAttr(note.title) + '">' +
                 '<div class="editor-toolbar">' +
                     '<div class="toolbar-row">' +
@@ -1867,7 +1915,8 @@
 
         if (currentSlug) {
             editBtn.style.display = '';
-            deleteBtn.style.display = '';
+            deleteBtn.style.display = currentNoteIsOwn ? '' : 'none';
+            shareBtn.style.display = currentNoteIsOwn ? '' : 'none';
             editBtn.title = isEditing ? 'Done' : 'Edit';
             editBtn.innerHTML = isEditing
                 ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>'
@@ -1875,6 +1924,7 @@
         } else {
             editBtn.style.display = 'none';
             deleteBtn.style.display = 'none';
+            shareBtn.style.display = 'none';
         }
     }
 
@@ -2007,6 +2057,8 @@
             sidebar.classList.remove('hidden');
             currentSlug = null;
             isEditing = false;
+            currentNoteIsOwn = true;
+            currentNotePermission = 'owner';
             showEmptyState();
             updateToolbar();
             history.pushState({}, '', '/notes');
@@ -2019,6 +2071,8 @@
         } else {
             currentSlug = null;
             isEditing = false;
+            currentNoteIsOwn = true;
+            currentNotePermission = 'owner';
             showEmptyState();
             updateToolbar();
             if (window.innerWidth <= 768) {
@@ -2028,12 +2082,165 @@
     });
 
     // =====================================================================
+    // Download All Notes
+    // =====================================================================
+
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', function() {
+            window.location.href = '/api/notes/download';
+        });
+    }
+
+    // =====================================================================
+    // Share Modal
+    // =====================================================================
+
+    function showShareModal() {
+        if (!currentSlug || !currentNoteIsOwn) return;
+
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML =
+            '<div class="confirm-dialog share-dialog" style="text-align:left; max-width:400px;">' +
+                '<h3>Share Note</h3>' +
+                '<div class="share-add-form">' +
+                    '<div class="hyperlink-field">' +
+                        '<label for="share-username">Username</label>' +
+                        '<input type="text" id="share-username" placeholder="Enter username">' +
+                    '</div>' +
+                    '<div class="hyperlink-field">' +
+                        '<label for="share-permission">Permission</label>' +
+                        '<select id="share-permission" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:var(--font-body);">' +
+                            '<option value="edit">Can edit</option>' +
+                            '<option value="view">View only</option>' +
+                        '</select>' +
+                    '</div>' +
+                    '<button class="btn btn-primary" id="share-add-btn" style="width:100%;">Share</button>' +
+                '</div>' +
+                '<div class="share-error" id="share-error" style="display:none;"></div>' +
+                '<div class="share-list" id="share-list"><div class="loading-spinner"></div></div>' +
+                '<div class="confirm-dialog-actions" style="margin-top:16px;">' +
+                    '<button class="btn-secondary" id="share-close" style="flex:1;padding:10px;border:none;border-radius:10px;font-size:15px;font-weight:500;font-family:var(--font-body);cursor:pointer;">Done</button>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+
+        var usernameInput = document.getElementById('share-username');
+        var permissionSelect = document.getElementById('share-permission');
+        var shareError = document.getElementById('share-error');
+        var shareList = document.getElementById('share-list');
+
+        usernameInput.focus();
+
+        function showError(msg) {
+            shareError.textContent = msg;
+            shareError.style.display = 'block';
+            setTimeout(function() { shareError.style.display = 'none'; }, 3000);
+        }
+
+        async function loadCollaborators() {
+            try {
+                var resp = await fetch('/api/notes/' + currentSlug + '/collaborators');
+                var collaborators = await resp.json();
+                if (collaborators.length === 0) {
+                    shareList.innerHTML = '<div class="share-empty">Not shared with anyone</div>';
+                } else {
+                    shareList.innerHTML = '';
+                    collaborators.forEach(function(c) {
+                        var item = document.createElement('div');
+                        item.className = 'share-item';
+                        item.innerHTML =
+                            '<span class="share-item-name">' + escapeHtml(c.username) + '</span>' +
+                            '<span class="share-item-perm">' + (c.permission === 'edit' ? 'Can edit' : 'View only') + '</span>' +
+                            '<button class="share-item-remove" data-id="' + c.id + '" title="Remove">&times;</button>';
+                        shareList.appendChild(item);
+                    });
+                }
+            } catch (err) {
+                shareList.innerHTML = '<div class="share-empty">Failed to load</div>';
+            }
+        }
+
+        loadCollaborators();
+
+        // Add collaborator
+        document.getElementById('share-add-btn').addEventListener('click', async function() {
+            var username = usernameInput.value.trim();
+            if (!username) { usernameInput.focus(); return; }
+            try {
+                var resp = await fetch('/api/notes/' + currentSlug + '/share', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username, permission: permissionSelect.value }),
+                });
+                var data = await resp.json();
+                if (!resp.ok) {
+                    showError(data.error || 'Failed to share');
+                } else {
+                    usernameInput.value = '';
+                    loadCollaborators();
+                }
+            } catch (err) {
+                showError('Network error');
+            }
+        });
+
+        usernameInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('share-add-btn').click();
+            }
+        });
+
+        // Remove collaborator
+        shareList.addEventListener('click', async function(e) {
+            var removeBtn = e.target.closest('.share-item-remove');
+            if (!removeBtn) return;
+            var shareId = removeBtn.dataset.id;
+            try {
+                await fetch('/api/notes/' + currentSlug + '/share/' + shareId, { method: 'DELETE' });
+                loadCollaborators();
+            } catch (err) {
+                showError('Failed to remove');
+            }
+        });
+
+        function cleanup() { overlay.remove(); }
+
+        document.getElementById('share-close').addEventListener('click', cleanup);
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) cleanup();
+        });
+    }
+
+    // =====================================================================
+    // Sidebar Tabs (My Notes / Shared)
+    // =====================================================================
+
+    function switchTab(tab) {
+        currentTab = tab;
+        currentPage = 1;
+        allLoaded = false;
+        tabMyNotes.classList.toggle('active', tab === 'mine');
+        tabShared.classList.toggle('active', tab === 'shared');
+        loadNotes(1, currentQuery, false);
+    }
+
+    if (tabMyNotes) {
+        tabMyNotes.addEventListener('click', function() { switchTab('mine'); });
+    }
+    if (tabShared) {
+        tabShared.addEventListener('click', function() { switchTab('shared'); });
+    }
+
+    // =====================================================================
     // Button Bindings + Keyboard Shortcuts
     // =====================================================================
 
     document.getElementById('new-note-btn').addEventListener('click', createNewNote);
     editBtn.addEventListener('click', toggleEdit);
     deleteBtn.addEventListener('click', deleteCurrentNote);
+    shareBtn.addEventListener('click', showShareModal);
 
     document.addEventListener('keydown', (e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'n') {

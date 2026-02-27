@@ -8,7 +8,7 @@
  *   navigation      → network-first, fallback to cached shell
  */
 
-const CACHE_NAME = 'notes-v1';
+const CACHE_NAME = 'notes-v2';
 
 const STATIC_ASSETS = [
     '/static/app.js',
