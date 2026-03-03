@@ -1,13 +1,13 @@
 services:
   - type: web
     runtime: python
-    name: notes-app
+    name: notes-app-dev
     plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile -
     healthCheckPath: /healthz
     disk:
-      name: media-storage
+      name: media-storage-dev
       mountPath: /var/data/media
       sizeGB: 1
     envVars:
@@ -15,7 +15,7 @@ services:
         generateValue: true
       - key: DATABASE_URL
         fromDatabase:
-          name: notes-db
+          name: notes-db-dev
           property: connectionString
       - key: MEDIA_DIR
         value: /var/data/media
@@ -23,7 +23,7 @@ services:
         value: "3.11.6"
 
 databases:
-  - name: notes-db
+  - name: notes-db-dev
     plan: starter
-    databaseName: notes
-    user: notes_user
+    databaseName: notes_dev
+    user: notes_dev_user
